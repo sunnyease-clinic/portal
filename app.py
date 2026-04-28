@@ -128,7 +128,7 @@ def inject_css(t):
     }}
     .portal-subtitle {{
         font-size: 1.15rem;
-        font-weight: 600;
+        font-weight: 500;
         color: {t['text']};
         margin-top: 5px;
     }}
@@ -147,7 +147,7 @@ def inject_css(t):
         margin-bottom: 1.1rem;
     }}
     .group-title {{
-        font-size: 1.15rem;
+        font-size: 1.25rem;
         font-weight: 700;
         color: {t['text']};
         border-left: 4px solid {t['accent']};
@@ -159,7 +159,7 @@ def inject_css(t):
         border: 1px solid {t['comment_border']};
         border-radius: 10px;
         padding: 0.7rem 1rem;
-        font-size: 0.95rem;
+        font-size: 1.08rem;
         line-height: 1.85;
         color: {t['text']};
         margin-bottom: 0.9rem;
@@ -167,7 +167,7 @@ def inject_css(t):
     .group-summary-label {{
         font-weight: 700;
         color: {t['accent']};
-        font-size: 0.82rem;
+        font-size: 0.9rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         margin-bottom: 0.35rem;
@@ -185,9 +185,17 @@ def inject_css(t):
         color: {t['accent']};
         border-radius: 999px;
         padding: 4px 14px;
-        font-size: 0.78rem;
+        font-size: 0.85rem;
         font-weight: 600;
         margin-bottom: 1.5rem;
+    }}
+
+    /* ── Expander (Historical Reports) ── */
+    div[data-testid="stExpanderDetails"] p,
+    div[data-testid="stExpanderDetails"] li {{
+        font-size: 1.08rem;
+        line-height: 1.75;
+        color: {t['text']};
     }}
 
     /* ── RWD: charts grid ── */
@@ -618,9 +626,13 @@ if st.session_state.historical_reports:
         </div>
     """, unsafe_allow_html=True)
     
+    import re
     for r in st.session_state.historical_reports:
         with st.expander(f"📅 {r.get('report_month', '')}"):
-            st.markdown(r.get('final_output', ''))
+            out_md = r.get('final_output', '')
+            # 將 a. b. c. 轉換為無序列表的 -，以便 Streamlit markdown 正確渲染第二層級
+            out_md = re.sub(r'^(\s+)[a-zA-Z]\.\s+', r'\1- ', out_md, flags=re.MULTILINE)
+            st.markdown(out_md)
             
     st.markdown('</div>', unsafe_allow_html=True)
 

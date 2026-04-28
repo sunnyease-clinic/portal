@@ -283,18 +283,22 @@ GROUPS = [
         "id": "ckd_mbd",
         "title": "🦴 2. 鈣磷代謝 (CKD-MBD)",
         "metrics": [
-            {"key": "09012C", "label": "血磷 (Phosphorus)",        "unit": "mg/dL",  "target_range": (3.5, 5.5)},
-            {"key": "09011C", "label": "血鈣 (Calcium)",            "unit": "mg/dL",  "target_range": (8.4, 10.2)},
-            {"key": "09122C", "label": "副甲狀腺素 (i-PTH)",        "unit": "pg/mL",  "target_range": (150, 600)},
-            {"key": "09027C", "label": "鹼性磷酸酶 (ALP)",          "unit": "U/L",    "target_range": (40, 130)},
+            {"key": "09012C",      "label": "血磷 (Phosphorus)",    "unit": "mg/dL",  "target_range": (3.5, 5.5)},
+            {"key": "09011C",      "label": "血鈣 (Calcium)",        "unit": "mg/dL",  "target_range": (8.4, 10.2)},
+            {"key": "CaP_product", "label": "鈣磷乘積 (Ca × P)",    "unit": "",        "target_range": (None, 55)},
+            {"key": "09122C",      "label": "副甲狀腺素 (i-PTH)",    "unit": "pg/mL",  "target_range": (150, 600)},
+            {"key": "09027C",      "label": "鹼性磷酸酶 (ALP)",      "unit": "U/L",    "target_range": (40, 130)},
         ],
     },
+
+
     {
         "id": "anemia",
         "title": "🩸 3. 造血與鐵質 (Anemia)",
         "metrics": [
             {"key": "08003C", "label": "血色素 (Hb)",       "unit": "g/dL",   "target_range": (10.0, 11.5)},
             {"key": "12116C", "label": "鐵蛋白 (Ferritin)", "unit": "ng/mL",  "target_range": (200, 800)},
+            {"key": "Tsat",   "label": "鐵飽和度 (TSAT%)",  "unit": "%",      "target_range": (20, 50)},
         ],
     },
 ]
@@ -371,7 +375,7 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
             y=pre_vals["value"].astype(float).tolist(),
             mode="lines+markers+text",
             name="BUN 洗前",
-            text=[f"{v:.0f}" for v in pre_vals["value"]],
+            text=[f"{v:.1f}" for v in pre_vals["value"]],
             textposition="top center",
             textfont=dict(size=10, color=t["chart_text"]),
             line=dict(color=color, width=2.5),
@@ -383,7 +387,7 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
                 y=post_vals_filtered["value"].astype(float).tolist(),
                 mode="markers+text",
                 name="BUN 洗後",
-                text=[f"{v:.0f}" for v in post_vals_filtered["value"]],
+                text=[f"{v:.1f}" for v in post_vals_filtered["value"]],
                 textposition="bottom center",
                 textfont=dict(size=10, color="#FFD93D"),
                 marker=dict(symbol="triangle-down", size=9, color="#FFD93D"),

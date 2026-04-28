@@ -277,7 +277,6 @@ GROUPS = [
             {"key": "09002C", "label": "尿素氮 (BUN)",          "unit": "mg/dL",  "target_range": None},
             {"key": "09015C", "label": "肌酸酐 (Creatinine)",   "unit": "mg/dL",  "target_range": None},
             {"key": "09022C", "label": "血鉀 (Potassium)",      "unit": "mmol/L", "target_range": (3.5, 5.5)},
-            {"key": "09021C", "label": "血鈉 (Sodium)",         "unit": "mmol/L", "target_range": (135.0, 145.0)},
         ],
     },
     {

@@ -127,9 +127,10 @@ def inject_css(t):
         letter-spacing: -0.5px;
     }}
     .portal-subtitle {{
-        font-size: 0.85rem;
-        color: {t['subtext']};
-        margin-top: 2px;
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: {t['text']};
+        margin-top: 5px;
     }}
 
     /* ── Group card ── */
@@ -146,7 +147,7 @@ def inject_css(t):
         margin-bottom: 1.1rem;
     }}
     .group-title {{
-        font-size: 1.05rem;
+        font-size: 1.15rem;
         font-weight: 700;
         color: {t['text']};
         border-left: 4px solid {t['accent']};
@@ -158,7 +159,7 @@ def inject_css(t):
         border: 1px solid {t['comment_border']};
         border-radius: 10px;
         padding: 0.7rem 1rem;
-        font-size: 0.84rem;
+        font-size: 0.95rem;
         line-height: 1.85;
         color: {t['text']};
         margin-bottom: 0.9rem;
@@ -166,7 +167,7 @@ def inject_css(t):
     .group-summary-label {{
         font-weight: 700;
         color: {t['accent']};
-        font-size: 0.75rem;
+        font-size: 0.82rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         margin-bottom: 0.35rem;
@@ -461,18 +462,14 @@ inject_css(t)
 # LOGIN PAGE
 # ══════════════════════════════════════════════════════════════════════
 if not st.session_state.logged_in:
-    # Top-right theme toggle (outside of login card)
-    col_pad, col_btn = st.columns([5, 1])
-    with col_btn:
-        if st.button(t["toggle_icon"], help=t["toggle_label"], key="theme_login"):
-            st.session_state.dark_mode = not st.session_state.dark_mode
-            st.rerun()
-
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-
     with st.container():
         col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
+            col_t1, col_t2 = st.columns([5, 1])
+            with col_t2:
+                if st.button(t["toggle_icon"], help=t["toggle_label"], key="theme_login"):
+                    st.session_state.dark_mode = not st.session_state.dark_mode
+                    st.rerun()
             with st.form("login_form"):
                 st.markdown(f"""
                 <div>
@@ -623,9 +620,7 @@ if st.session_state.historical_reports:
     
     for r in st.session_state.historical_reports:
         with st.expander(f"📅 {r.get('report_month', '')}"):
-            st.markdown(f"""<div style="font-size:0.9rem; line-height:1.7; color:{t['text']}; padding: 0.5rem 0.2rem;">
-                {r.get('final_output', '')}
-            </div>""", unsafe_allow_html=True)
+            st.markdown(r.get('final_output', ''))
             
     st.markdown('</div>', unsafe_allow_html=True)
 

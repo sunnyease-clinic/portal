@@ -274,7 +274,7 @@ GROUPS = [
         "title": "🥗 1. 營養與代謝",
         "metrics": [
             {"key": "09038C", "label": "白蛋白 (Albumin)",     "unit": "g/dL",   "target_range": (3.8, 5.0)},
-            {"key": "09002C", "label": "尿素氮 (BUN)",          "unit": "mg/dL",  "target_range": None},
+            {"key": "09002C", "label": "尿素氮 (BUN)",          "unit": "mg/dL",  "target_range": None, "bun_mode": True},
             {"key": "09015C", "label": "肌酸酐 (Creatinine)",   "unit": "mg/dL",  "target_range": None},
             {"key": "09022C", "label": "血鉀 (Potassium)",      "unit": "mmol/L", "target_range": (3.5, 5.5)},
         ],
@@ -343,44 +343,86 @@ def generate_comment_html(metrics_with_data: list) -> str:
         lines.append(f'<span class="comment-line">・{label}：最新 <b>{latest:.1f}</b>　{trend} {status_str}</span>')
     return "<br>".join(lines)
 
-def build_chart(metric, data: pd.DataFrame, color: str, t: dict) -> go.Figure | None:
+def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
     sub = data[data["nhi_code"] == metric["key"]].copy()
     if sub.empty:
         return None, None
     sub = sub.sort_values("visit_date")
-    agg = sub.groupby("visit_date")["test_result_numeric"].mean().reset_index()
-    agg.columns = ["visit_date", "value"]
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=agg["visit_date"].dt.strftime("%m/%d").tolist(),
-        y=agg["value"].astype(float).tolist(),
-        mode="lines+markers+text",
-        name=metric["label"],
-        text=[f"{v:.1f}" for v in agg["value"]],
-        textposition="top center",
-        textfont=dict(size=11, color=t["chart_text"]),
-        line=dict(color=color, width=2.5),
-        marker=dict(symbol="circle", size=8, color=color),
-    ))
-
+    bun_mode = metric.get("bun_mode", False)
     tr = metric.get("target_range")
     lo, hi = (tr[0], tr[1]) if tr else (None, None)
+    fig = go.Figure()
+
+    if bun_mode:
+        # 洗前 = 同日最高值；洗後 = 同日最低值
+        grouped    = sub.groupby("visit_date")["test_result_numeric"]
+        pre_vals   = grouped.max().reset_index()
+        post_vals  = grouped.min().reset_index()
+        pre_vals.columns  = ["visit_date", "value"]
+        post_vals.columns = ["visit_date", "value"]
+
+        # 只有真正有兩筆的日期才顯示洗後
+        multi_day         = grouped.count()[grouped.count() > 1].index
+        post_vals_filtered = post_vals[post_vals["visit_date"].isin(multi_day)]
+
+        fig.add_trace(go.Scatter(
+            x=pre_vals["visit_date"].dt.strftime("%m/%d").tolist(),
+            y=pre_vals["value"].astype(float).tolist(),
+            mode="lines+markers+text",
+            name="BUN 洗前",
+            text=[f"{v:.0f}" for v in pre_vals["value"]],
+            textposition="top center",
+            textfont=dict(size=10, color=t["chart_text"]),
+            line=dict(color=color, width=2.5),
+            marker=dict(symbol="circle", size=8, color=color),
+        ))
+        if not post_vals_filtered.empty:
+            fig.add_trace(go.Scatter(
+                x=post_vals_filtered["visit_date"].dt.strftime("%m/%d").tolist(),
+                y=post_vals_filtered["value"].astype(float).tolist(),
+                mode="markers+text",
+                name="BUN 洗後",
+                text=[f"{v:.0f}" for v in post_vals_filtered["value"]],
+                textposition="bottom center",
+                textfont=dict(size=10, color="#FFD93D"),
+                marker=dict(symbol="triangle-down", size=9, color="#FFD93D"),
+            ))
+        all_y   = pre_vals["value"].tolist()
+        if not post_vals_filtered.empty:
+            all_y += post_vals_filtered["value"].tolist()
+        series_for_comment = pre_vals["value"]
+    else:
+        agg = sub.groupby("visit_date")["test_result_numeric"].mean().reset_index()
+        agg.columns = ["visit_date", "value"]
+        fig.add_trace(go.Scatter(
+            x=agg["visit_date"].dt.strftime("%m/%d").tolist(),
+            y=agg["value"].astype(float).tolist(),
+            mode="lines+markers+text",
+            name=metric["label"],
+            text=[f"{v:.1f}" for v in agg["value"]],
+            textposition="top center",
+            textfont=dict(size=11, color=t["chart_text"]),
+            line=dict(color=color, width=2.5),
+            marker=dict(symbol="circle", size=8, color=color),
+        ))
+        all_y  = agg["value"].tolist()
+        series_for_comment = agg["value"]
+
     if lo is not None and hi is not None:
         fig.add_hrect(y0=lo, y1=hi,
                       fillcolor="rgba(78,205,196,0.10)", line_width=0,
-                      annotation_text=f"目標 {lo}–{hi}",
+                      annotation_text=f"目標 {lo}\u2013{hi}",
                       annotation_position="top left",
                       annotation_font_size=10,
                       annotation_font_color=t["accent"])
 
-    all_y = agg["value"].tolist()
     v_min = min(all_y + ([lo] if lo else []))
     v_max = max(all_y + ([hi] if hi else []))
     span  = max(v_max - v_min, 2.0)
     fig.update_layout(
         height=230,
-        margin=dict(l=10, r=10, t=28, b=20),
+        margin=dict(l=10, r=10, t=28, b=30),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="'Inter',sans-serif", color=t["chart_text"]),
@@ -390,11 +432,14 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict) -> go.Figure | 
                    range=[v_min - span*0.35, v_max + span*0.45],
                    tickfont=dict(size=10, color=t["subtext"]),
                    fixedrange=True, zeroline=False),
-        showlegend=False,
+        showlegend=bun_mode,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                    xanchor="right", x=1,
+                    font=dict(size=10, color=t["subtext"])),
         hovermode="x unified",
         hoverlabel=dict(bgcolor=t["surface"], font_size=12, font_color=t["text"]),
     )
-    return fig, agg["value"]
+    return fig, series_for_comment
 
 # ─── Session init ─────────────────────────────────────────────────────────────
 if "logged_in" not in st.session_state:

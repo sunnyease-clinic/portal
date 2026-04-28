@@ -451,6 +451,8 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in   = False
     st.session_state.trend_data  = None
     st.session_state.last_updated = None
+    st.session_state.display_name = None
+    st.session_state.historical_reports = None
 
 t = get_theme()
 inject_css(t)
@@ -489,16 +491,17 @@ if not st.session_state.logged_in:
                         with st.spinner("安全驗證中…"):
                             cloud_id = get_hash_id(national_id, mobile_last4)
                             try:
-                                resp = supabase.table("cloud_patients").select("trend_data,last_updated").eq("cloud_id", cloud_id).execute()
+                                resp = supabase.table("cloud_patients").select("trend_data,last_updated,display_name,historical_reports").eq("cloud_id", cloud_id).execute()
                                 if resp.data:
-                                    st.session_state.trend_data   = resp.data[0]["trend_data"]
-                                    st.session_state.last_updated = resp.data[0]["last_updated"]
+                                    st.session_state.trend_data   = resp.data[0].get("trend_data")
+                                    st.session_state.last_updated = resp.data[0].get("last_updated")
+                                    st.session_state.display_name = resp.data[0].get("display_name", "")
+                                    st.session_state.historical_reports = resp.data[0].get("historical_reports", [])
                                     st.session_state.logged_in    = True
                                     st.rerun()
                                 else:
                                     st.error("找不到相符的資料，請確認輸入是否正確。若近期未回診可能暫無資料。")
                             except Exception:
-                                st.error("系統連線錯誤，請稍後再試。")
                                 st.error("系統連線錯誤，請稍後再試。")
     st.stop()
 
@@ -519,13 +522,14 @@ if not df.empty and "visit_date" in df.columns:
 st.markdown('<div class="portal-wrap">', unsafe_allow_html=True)
 
 # ── Header ──────────────────────────────────────────────────────────────────
+greeting = f"{st.session_state.display_name}您好，" if st.session_state.display_name else ""
 hdr_left, hdr_right = st.columns([5, 1])
 with hdr_left:
     st.markdown(f"""
     <div class="portal-header">
         <div class="portal-header-left">
             <span class="portal-clinic-name">向怡診所</span>
-            <span class="portal-subtitle">個人健康趨勢儀表板</span>
+            <span class="portal-subtitle">{greeting}這是您的個人健康趨勢儀表板</span>
         </div>
     </div>""", unsafe_allow_html=True)
 with hdr_right:
@@ -536,6 +540,8 @@ with hdr_right:
         st.session_state.logged_in   = False
         st.session_state.trend_data  = None
         st.session_state.last_updated = None
+        st.session_state.display_name = None
+        st.session_state.historical_reports = None
         st.rerun()
 
 # ── Update badge ─────────────────────────────────────────────────────────────
@@ -602,6 +608,26 @@ for group in GROUPS:
                 )
 
     st.markdown('</div>', unsafe_allow_html=True)  # close group-card
+
+# ── Historical Reports ───────────────────────────────────────────────────────
+if st.session_state.historical_reports:
+    st.markdown(f"""
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-title">📚 歷史衛教報告</div>
+            <div style="font-size: 0.85rem; color: {t['subtext']}; padding-left: 12px; margin-bottom: 1rem;">
+                點擊下方月份，展開查看過往的追蹤短評紀錄。
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    for r in st.session_state.historical_reports:
+        with st.expander(f"📅 {r.get('report_month', '')}"):
+            st.markdown(f"""<div style="font-size:0.9rem; line-height:1.7; color:{t['text']}; padding: 0.5rem 0.2rem;">
+                {r.get('final_output', '')}
+            </div>""", unsafe_allow_html=True)
+            
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown(f"""

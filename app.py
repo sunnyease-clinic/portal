@@ -577,14 +577,13 @@ for group in GROUPS:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── RWD chart grid via HTML wrapper + st.columns ──────────────────────────
-    # We use st.columns but wrap with the CSS grid class via JS width trick:
-    # Streamlit columns already do 2-col on wide; CSS @media will collapse on mobile.
+    # ── RWD chart grid — always 2 columns; single charts occupy left col only ──
     chunks = [metrics_with_data[i:i+2] for i in range(0, len(metrics_with_data), 2)]
     for chunk in chunks:
-        cols = st.columns(len(chunk))
-        for col, md in zip(cols, chunk):
-            with col:
+        col_left, col_right = st.columns(2)
+        for idx, md in enumerate(chunk):
+            target_col = col_left if idx == 0 else col_right
+            with target_col:
                 unit_str = f" <span style='color:{t['subtext']};font-size:0.77rem;'>({md['unit']})</span>" if md.get("unit") else ""
                 st.markdown(f'<div class="metric-label">{md["label"]}{unit_str}</div>', unsafe_allow_html=True)
                 st.plotly_chart(

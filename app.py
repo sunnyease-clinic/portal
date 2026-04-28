@@ -7,7 +7,7 @@ from datetime import datetime
 
 # ─── Page Config ────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="SunnyEase 診所 - 個人健康儀表板",
+    page_title="向怡診所 - 個人健康儀表板",
     layout="wide",
     page_icon="🏥",
     initial_sidebar_state="collapsed",
@@ -201,34 +201,27 @@ def inject_css(t):
     }}
 
     /* ── Login page ── */
-    .login-outer {{
-        min-height: 95vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    [data-testid="stForm"] {{
+        background: {t['surface']} !important;
+        border: 1px solid {t['border']} !important;
+        border-radius: 24px !important;
+        padding: 2.5rem 2.2rem !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.18) !important;
     }}
-    .login-card {{
-        background: {t['surface']};
-        border: 1px solid {t['border']};
-        border-radius: 24px;
-        padding: 2.5rem 2.2rem;
-        width: 100%;
-        max-width: 400px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.18);
-        text-align: center;
-    }}
-    .login-icon {{ font-size: 3rem; margin-bottom: 0.5rem; }}
+    .login-icon {{ font-size: 3rem; margin-bottom: 0.5rem; text-align: center; }}
     .login-title {{
         font-size: 1.6rem;
         font-weight: 800;
         color: {t['accent']};
         margin-bottom: 0.3rem;
+        text-align: center;
     }}
     .login-sub {{
         font-size: 0.85rem;
         color: {t['subtext']};
         margin-bottom: 1.8rem;
         line-height: 1.6;
+        text-align: center;
     }}
 
     /* ── Streamlit input overrides ── */
@@ -424,21 +417,19 @@ if not st.session_state.logged_in:
             st.session_state.dark_mode = not st.session_state.dark_mode
             st.rerun()
 
-    # Centre the login card with HTML
-    st.markdown('<div class="login-outer">', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="login-card">
-        <div class="login-icon">🏥</div>
-        <div class="login-title">SunnyEase 診所</div>
-        <div class="login-sub">請輸入您的身分驗證資料<br>以查看個人健康趨勢報告</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-    # The actual Streamlit form (placed right after so it overlaps visually)
     with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
+        col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
             with st.form("login_form"):
+                st.markdown(f"""
+                <div>
+                    <div class="login-icon">🏥</div>
+                    <div class="login-title">向怡診所</div>
+                    <div class="login-sub">請輸入您的身分驗證資料<br>以查看個人健康趨勢報告</div>
+                </div>
+                """, unsafe_allow_html=True)
                 national_id   = st.text_input("身分證字號", placeholder="例如：A123456789")
                 mobile_last4  = st.text_input("手機號碼末四碼", placeholder="例如：0987", max_chars=4, type="password")
                 submitted     = st.form_submit_button("🔓 登入並查看報告", use_container_width=True, type="primary")
@@ -459,7 +450,7 @@ if not st.session_state.logged_in:
                                     st.error("找不到相符的資料，請確認輸入是否正確。若近期未回診可能暫無資料。")
                             except Exception:
                                 st.error("系統連線錯誤，請稍後再試。")
-    st.markdown('</div>', unsafe_allow_html=True)
+                                st.error("系統連線錯誤，請稍後再試。")
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════
@@ -484,7 +475,7 @@ with hdr_left:
     st.markdown(f"""
     <div class="portal-header">
         <div class="portal-header-left">
-            <span class="portal-clinic-name">🏥 SunnyEase 診所</span>
+            <span class="portal-clinic-name">向怡診所</span>
             <span class="portal-subtitle">個人健康趨勢儀表板</span>
         </div>
     </div>""", unsafe_allow_html=True)
@@ -529,6 +520,15 @@ for group in GROUPS:
         st.markdown('</div>', unsafe_allow_html=True)
         continue
 
+    # ── Commentary card ───────────────────────────────────────────────────────
+    comment_html = generate_comment_html(metrics_with_data)
+    st.markdown(f"""
+    <div class="comment-card" style="margin-top: 0; margin-bottom: 1.5rem;">
+        <div class="comment-card-title">📝 本期追蹤摘要</div>
+        {comment_html}
+    </div>
+    """, unsafe_allow_html=True)
+
     # ── RWD chart grid via HTML wrapper + st.columns ──────────────────────────
     # We use st.columns but wrap with the CSS grid class via JS width trick:
     # Streamlit columns already do 2-col on wide; CSS @media will collapse on mobile.
@@ -546,22 +546,13 @@ for group in GROUPS:
                     key=f"chart_{group['id']}_{md['label']}",
                 )
 
-    # ── Commentary card ───────────────────────────────────────────────────────
-    comment_html = generate_comment_html(metrics_with_data)
-    st.markdown(f"""
-    <div class="comment-card">
-        <div class="comment-card-title">📝 本期追蹤摘要</div>
-        {comment_html}
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown('</div>', unsafe_allow_html=True)  # close group-card
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div style="text-align:center; padding: 2rem 0 1rem; color:{t['subtext']}; font-size:0.78rem; border-top: 1px solid {t['border']}; margin-top: 1.5rem;">
     此儀表板由 NephroSystem 自動生成，供個人照護參考，請依醫囑進行治療。<br>
-    © SunnyEase 診所
+    © 向怡診所
 </div>
 """, unsafe_allow_html=True)
 

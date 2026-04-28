@@ -142,33 +142,34 @@ def inject_css(t):
         box-shadow: 0 4px 24px rgba(0,0,0,0.07);
         transition: background 0.3s ease;
     }}
+    .group-header {{
+        margin-bottom: 1.1rem;
+    }}
     .group-title {{
         font-size: 1.05rem;
         font-weight: 700;
         color: {t['text']};
         border-left: 4px solid {t['accent']};
         padding-left: 12px;
-        margin-bottom: 1rem;
+        margin-bottom: 0.7rem;
     }}
-
-    /* ── Comment card ── */
-    .comment-card {{
+    .group-summary {{
         background: {t['comment_bg']};
         border: 1px solid {t['comment_border']};
-        border-radius: 14px;
-        padding: 1rem 1.2rem;
-        margin-top: 1rem;
-        font-size: 0.88rem;
+        border-radius: 10px;
+        padding: 0.7rem 1rem;
+        font-size: 0.84rem;
         line-height: 1.85;
         color: {t['text']};
+        margin-bottom: 0.9rem;
     }}
-    .comment-card-title {{
+    .group-summary-label {{
         font-weight: 700;
         color: {t['accent']};
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.35rem;
     }}
     .comment-line {{ color: {t['text']}; }}
     .status-good  {{ color: #22c55e; font-weight: 600; }}
@@ -546,7 +547,7 @@ except Exception:
 
 # ── Groups ───────────────────────────────────────────────────────────────────
 for group in GROUPS:
-    st.markdown(f'<div class="group-card"><div class="group-title">{group["title"]}</div>', unsafe_allow_html=True)
+
 
     metrics_with_data = []
     color_idx = 0
@@ -564,17 +565,24 @@ for group in GROUPS:
             })
 
     if not metrics_with_data:
-        st.markdown('<div class="no-data">此區塊暫無近期檢驗資料。</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="group-card">
+            <div class="group-title">{group["title"]}</div>
+            <div class="no-data">此區塊暫無近期檢驗資料。</div>
+        </div>""", unsafe_allow_html=True)
         continue
 
-    # ── Commentary card ───────────────────────────────────────────────────────
+    # ── Open the single group-card and render title + summary together ────────
     comment_html = generate_comment_html(metrics_with_data)
     st.markdown(f"""
-    <div class="comment-card" style="margin-top: 0; margin-bottom: 1.5rem;">
-        <div class="comment-card-title">📝 本期追蹤摘要</div>
-        {comment_html}
-    </div>
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-title">{group["title"]}</div>
+            <div class="group-summary">
+                <div class="group-summary-label">📝 本期追蹤摘要</div>
+                {comment_html}
+            </div>
+        </div>
     """, unsafe_allow_html=True)
 
     # ── RWD chart grid — always 2 columns; single charts occupy left col only ──

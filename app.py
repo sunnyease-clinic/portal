@@ -93,6 +93,7 @@ def inject_css(t):
     div[data-testid="stMarkdownContainer"] p,
     div[data-testid="stMarkdownContainer"] span,
     div[data-testid="stCaptionContainer"] {{ color: {t['subtext']}; }}
+    div[data-testid="stForm"] small {{ display: none !important; }}
     .stAlert {{ border-radius: 12px; }}
     button[kind="primary"] {{
         background: {t['accent']} !important;

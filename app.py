@@ -93,7 +93,7 @@ def inject_css(t):
     div[data-testid="stMarkdownContainer"] p,
     div[data-testid="stMarkdownContainer"] span,
     div[data-testid="stCaptionContainer"] {{ color: {t['subtext']}; }}
-    div[data-testid="stForm"] small {{ display: none !important; }}
+    div[data-testid="InputInstructions"] {{ display: none !important; }}
     .stAlert {{ border-radius: 12px; }}
     button[kind="primary"] {{
         background: {t['accent']} !important;
@@ -424,11 +424,27 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
         all_y  = agg["value"].tolist()
         series_for_comment = agg["value"]
 
+    # Target range shading — supports (lo, hi), (None, hi), (lo, None)
     if lo is not None and hi is not None:
         fig.add_hrect(y0=lo, y1=hi,
                       fillcolor="rgba(78,205,196,0.10)", line_width=0,
                       annotation_text=f"目標 {lo}\u2013{hi}",
                       annotation_position="top left",
+                      annotation_font_size=10,
+                      annotation_font_color=t["accent"])
+    elif hi is not None and lo is None:
+        # Upper-only bound: draw a dashed threshold line
+        fig.add_hline(y=hi,
+                      line=dict(color=t["accent"], width=1.5, dash="dash"),
+                      annotation_text=f"目標 <{hi}",
+                      annotation_position="top left",
+                      annotation_font_size=10,
+                      annotation_font_color=t["accent"])
+    elif lo is not None and hi is None:
+        fig.add_hline(y=lo,
+                      line=dict(color=t["accent"], width=1.5, dash="dash"),
+                      annotation_text=f"目標 >{lo}",
+                      annotation_position="bottom left",
                       annotation_font_size=10,
                       annotation_font_color=t["accent"])
 
@@ -506,7 +522,7 @@ if not st.session_state.logged_in:
                                     st.session_state.logged_in    = True
                                     st.rerun()
                                 else:
-                                    st.error("找不到相符的資料，請確認輸入是否正確。若近期未回診可能暫無資料。")
+                                    st.error("找不到相符的資料，請確認輸入是否正確。")
                             except Exception:
                                 st.error("系統連線錯誤，請稍後再試。")
     st.stop()

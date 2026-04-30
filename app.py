@@ -278,41 +278,94 @@ def get_hash_id(national_id: str, mobile_last4: str) -> str:
     payload = f"{nid}_{mob}_{CLINIC_SECRET}"
     return hashlib.sha256(payload.encode()).hexdigest()
 
+@st.cache_data(ttl=300)
+def load_clinical_rules() -> dict:
+    try:
+        resp = supabase.table("cloud_clinical_rules").select("rule_key,rule_value,unit").execute()
+        rules = {}
+        if resp.data:
+            for row in resp.data:
+                rules[row["rule_key"]] = {"raw": row["rule_value"], "unit": row["unit"]}
+        return rules
+    except Exception:
+        return {}
+
+def parse_rule_range(rule_str: str) -> tuple | None:
+    rule_str = str(rule_str).strip()
+    try:
+        if "-" in rule_str and not rule_str.startswith("-"):
+            parts = rule_str.split("-")
+            return float(parts[0]), float(parts[1])
+        if rule_str.startswith("<"):
+            return 0.0, float(rule_str.replace("<=", "").replace("<", "").strip())
+        if rule_str.startswith(">"):
+            return float(rule_str.replace(">=", "").replace(">", "").strip()), None
+    except Exception:
+        pass
+    return None
+
 # ─── Clinical Groups Definition ─────────────────────────────────────────────
-GROUPS = [
+# rule_key 的名稱對應 SQLite ClinicalRules 表的 rule_key 欄位
+# target_range 作為 fallback（當 Supabase 尚無資料時使用）
+BASE_GROUPS = [
     {
         "id": "nutrition",
         "title": "🥗 1. 營養與代謝",
         "metrics": [
-            {"key": "09038C", "label": "白蛋白 (Albumin)",     "unit": "g/dL",   "target_range": (3.8, 5.0)},
-            {"key": "09002C", "label": "尿素氮 (BUN)",          "unit": "mg/dL",  "target_range": None, "bun_mode": True},
-            {"key": "09015C", "label": "肌酸酐 (Creatinine)",   "unit": "mg/dL",  "target_range": None},
-            {"key": "09022C", "label": "血鉀 (Potassium)",      "unit": "mmol/L", "target_range": (3.5, 5.5)},
+            {"key": "09038C", "label": "白蛋白 (Albumin)",     "unit": "g/dL",  "rule_key": "albumin_target",   "target_range": (3.8, 5.0)},
+            {"key": "09002C", "label": "尿素氮 (BUN)",          "unit": "mg/dL", "target_range": None, "bun_mode": True},
+            {"key": "09015C", "label": "肌酸酐 (Creatinine)",   "unit": "mg/dL", "target_range": None},
+            {"key": "09022C", "label": "血鉀 (Potassium)",      "unit": "mEq/L", "rule_key": "potassium_target", "target_range": (3.5, 5.5)},
         ],
     },
     {
         "id": "ckd_mbd",
         "title": "🦴 2. 鈣磷代謝 (CKD-MBD)",
         "metrics": [
-            {"key": "09012C",      "label": "血磷 (Phosphorus)",    "unit": "mg/dL",  "target_range": (3.5, 5.5)},
-            {"key": "09011C",      "label": "血鈣 (Calcium)",        "unit": "mg/dL",  "target_range": (8.4, 10.2)},
-            {"key": "CaP_product", "label": "鈣磷乘積 (Ca × P)",    "unit": "",        "target_range": (None, 55)},
-            {"key": "09122C",      "label": "副甲狀腺素 (i-PTH)",    "unit": "pg/mL",  "target_range": (150, 600)},
-            {"key": "09027C",      "label": "鹼性磷酸酶 (ALP)",      "unit": "U/L",    "target_range": (40, 130)},
+            {"key": "09012C",      "label": "血磷 (Phosphorus)",  "unit": "mg/dL", "rule_key": "phosphorus_target",    "target_range": (3.5, 5.5)},
+            {"key": "09011C",      "label": "血鈣 (Calcium)",      "unit": "mg/dL", "rule_key": "calcium_target",       "target_range": (8.4, 10.2)},
+            {"key": "CaP_product", "label": "鈣磷乘積 (Ca × P)",  "unit": "",       "rule_key": "ca_p_product_target",  "target_range": (0, 55)},
+            {"key": "09122C",      "label": "副甲狀腺素 (i-PTH)", "unit": "pg/mL", "rule_key": "intact-PTH",           "target_range": (150, 600)},
+            {"key": "09027C",      "label": "鹼性磷酸酶 (ALP)",   "unit": "U/L",   "rule_key": "alp_target",           "target_range": (40, 130)},
         ],
     },
-
-
     {
         "id": "anemia",
         "title": "🩸 3. 造血與鐵質 (Anemia)",
         "metrics": [
-            {"key": "08003C", "label": "血色素 (Hb)",       "unit": "g/dL",   "target_range": (10.0, 11.5)},
-            {"key": "12116C", "label": "鐵蛋白 (Ferritin)", "unit": "ng/mL",  "target_range": (200, 800)},
-            {"key": "Tsat",   "label": "鐵飽和度 (TSAT%)",  "unit": "%",      "target_range": (20, 50)},
+            {"key": "08003C", "label": "血色素 (Hb)",       "unit": "g/dL",  "rule_key": "hb_target_dialysis", "target_range": (10.0, 11.5)},
+            {"key": "12116C", "label": "鐵蛋白 (Ferritin)", "unit": "ng/mL", "rule_key": "ferritin_target",    "target_range": (200, 800)},
+            {"key": "Tsat",   "label": "鐵飽和度 (TSAT%)",  "unit": "%",     "rule_key": "tsat_target",        "target_range": (20, 50)},
         ],
     },
 ]
+
+
+def get_groups():
+    """Build GROUPS list, overriding target_range and unit from cloud_clinical_rules if available."""
+    rules = load_clinical_rules()
+    import copy
+    groups = []
+    for bg in BASE_GROUPS:
+        g = copy.deepcopy(bg)
+        for m in g["metrics"]:
+            rkey = m.get("rule_key")
+            if rkey and rkey in rules:
+                raw = rules[rkey]["raw"]
+                unit = rules[rkey].get("unit", "")
+                if unit:
+                    m["unit"] = unit
+                parsed = parse_rule_range(raw)
+                if parsed:
+                    lo, hi = parsed
+                    # For ‘<N’ rules, lo=0 so we can draw a standard colour band
+                    if hi is None:
+                        # ‘>N’ rule — keep fallback target_range as-is; no universal way to draw
+                        pass
+                    else:
+                        m["target_range"] = (lo if lo is not None else 0, hi)
+        groups.append(g)
+    return groups
 
 PALETTE = ["#4ECDC4", "#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF", "#F2A65A", "#C77DFF"]
 
@@ -424,27 +477,13 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
         all_y  = agg["value"].tolist()
         series_for_comment = agg["value"]
 
-    # Target range shading — supports (lo, hi), (None, hi), (lo, None)
+    # Target range shading
     if lo is not None and hi is not None:
+        annot_txt = f"目標 <{hi}" if lo == 0 else f"目標 {lo}\u2013{hi}"
         fig.add_hrect(y0=lo, y1=hi,
                       fillcolor="rgba(78,205,196,0.10)", line_width=0,
-                      annotation_text=f"目標 {lo}\u2013{hi}",
+                      annotation_text=annot_txt,
                       annotation_position="top left",
-                      annotation_font_size=10,
-                      annotation_font_color=t["accent"])
-    elif hi is not None and lo is None:
-        # Upper-only bound: draw a dashed threshold line
-        fig.add_hline(y=hi,
-                      line=dict(color=t["accent"], width=1.5, dash="dash"),
-                      annotation_text=f"目標 <{hi}",
-                      annotation_position="top left",
-                      annotation_font_size=10,
-                      annotation_font_color=t["accent"])
-    elif lo is not None and hi is None:
-        fig.add_hline(y=lo,
-                      line=dict(color=t["accent"], width=1.5, dash="dash"),
-                      annotation_text=f"目標 >{lo}",
-                      annotation_position="bottom left",
                       annotation_font_size=10,
                       annotation_font_color=t["accent"])
 
@@ -574,7 +613,7 @@ except Exception:
     pass
 
 # ── Groups ───────────────────────────────────────────────────────────────────
-for group in GROUPS:
+for group in get_groups():
 
 
     metrics_with_data = []

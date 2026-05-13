@@ -193,11 +193,17 @@ def inject_css(t):
 
     /* ── Expander (Historical Reports) ── */
     div[data-testid="stExpanderDetails"] p,
-    div[data-testid="stExpanderDetails"] li {{
+    div[data-testid="stExpanderDetails"] li {
         font-size: 1.08rem;
         line-height: 1.75;
         color: {t['text']};
-    }}
+    }
+    div[data-testid="stExpanderDetails"] mark {
+        background-color: rgba(255, 217, 61, 0.35);
+        color: inherit;
+        border-radius: 4px;
+        padding: 0 4px;
+    }
 
     /* ── RWD: charts grid ── */
     .charts-grid {{
@@ -269,14 +275,27 @@ def inject_css(t):
     </style>
     """, unsafe_allow_html=True)
 
-# ─── Hashing ────────────────────────────────────────────────────────────────
-def get_hash_id(national_id: str, mobile_last4: str) -> str:
+# ─── Hashing & Security ──────────────────────────────────────────────────────
+def get_hash_id(national_id: str) -> str:
     nid = str(national_id).upper().strip()
-    mob = str(mobile_last4).strip()
-    if not mob or len(mob) < 4:
-        mob = "0000"
-    payload = f"{nid}_{mob}_{CLINIC_SECRET}"
+    payload = f"{nid}_{CLINIC_SECRET}"
     return hashlib.sha256(payload.encode()).hexdigest()
+
+def get_temp_pw_hash(mobile_last4: str) -> str:
+    mob = str(mobile_last4).strip()
+    payload = f"{mob}_{CLINIC_SECRET}"
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+def _hash_password(password: str, salt: str = None) -> tuple[str, str]:
+    if salt is None:
+        import os
+        salt = os.urandom(16).hex()
+    hashed = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+    return hashed, salt
+
+def verify_custom_password(plain: str, stored_hash: str, salt: str) -> bool:
+    h, _ = _hash_password(plain, salt)
+    return h == stored_hash
 
 @st.cache_data(ttl=300)
 def load_clinical_rules() -> dict:
@@ -514,10 +533,12 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
 # ─── Session init ─────────────────────────────────────────────────────────────
 if "logged_in" not in st.session_state:
     st.session_state.logged_in   = False
+    st.session_state.cloud_id    = None
     st.session_state.trend_data  = None
     st.session_state.last_updated = None
     st.session_state.display_name = None
     st.session_state.historical_reports = None
+    st.session_state.forgot_pw_mode = False
 
 t = get_theme()
 inject_css(t)
@@ -534,36 +555,100 @@ if not st.session_state.logged_in:
                 if st.button(t["toggle_icon"], help=t["toggle_label"], key="theme_login"):
                     st.session_state.dark_mode = not st.session_state.dark_mode
                     st.rerun()
-            with st.form("login_form"):
-                st.markdown(f"""
-                <div>
-                    <div class="login-icon">🏥</div>
-                    <div class="login-title">向怡診所</div>
-                    <div class="login-sub">請輸入您的身分驗證資料<br>以查看個人健康趨勢報告</div>
-                </div>
-                """, unsafe_allow_html=True)
-                national_id   = st.text_input("身分證字號", placeholder="例如：A123456789")
-                mobile_last4  = st.text_input("手機號碼末四碼", placeholder="例如：0987", max_chars=4, type="password")
-                submitted     = st.form_submit_button("🔓 登入並查看報告", use_container_width=True, type="primary")
-                if submitted:
-                    if not national_id or not mobile_last4:
-                        st.error("請完整填寫身分證字號與手機末四碼。")
-                    else:
-                        with st.spinner("安全驗證中…"):
-                            cloud_id = get_hash_id(national_id, mobile_last4)
-                            try:
-                                resp = supabase.table("cloud_patients").select("trend_data,last_updated,display_name,historical_reports").eq("cloud_id", cloud_id).execute()
-                                if resp.data:
-                                    st.session_state.trend_data   = resp.data[0].get("trend_data")
-                                    st.session_state.last_updated = resp.data[0].get("last_updated")
-                                    st.session_state.display_name = resp.data[0].get("display_name", "")
-                                    st.session_state.historical_reports = resp.data[0].get("historical_reports", [])
-                                    st.session_state.logged_in    = True
-                                    st.rerun()
-                                else:
-                                    st.error("找不到相符的資料，請確認輸入是否正確。")
-                            except Exception:
-                                st.error("系統連線錯誤，請稍後再試。")
+
+            if not st.session_state.forgot_pw_mode:
+                # ── Normal Login Form ──
+                with st.form("login_form"):
+                    st.markdown(f"""
+                    <div>
+                        <div class="login-icon">🏥</div>
+                        <div class="login-title">向怡診所</div>
+                        <div class="login-sub">請輸入您的身分驗證資料<br>預設密碼為手機末四碼</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    national_id   = st.text_input("身分證字號", placeholder="例如：A123456789")
+                    password      = st.text_input("密碼", placeholder="請輸入密碼", type="password")
+                    submitted     = st.form_submit_button("🔓 登入並查看報告", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        if not national_id or not password:
+                            st.error("請完整填寫身分證字號與密碼。")
+                        else:
+                            with st.spinner("安全驗證中…"):
+                                cloud_id = get_hash_id(national_id)
+                                try:
+                                    resp = supabase.table("cloud_patients").select("*").eq("cloud_id", cloud_id).execute()
+                                    if resp.data:
+                                        user_data = resp.data[0]
+                                        valid = False
+                                        
+                                        # 1. 優先檢查自訂密碼
+                                        if user_data.get("password_hash"):
+                                            valid = verify_custom_password(password, user_data["password_hash"], user_data.get("salt", ""))
+                                        else:
+                                            # 2. 檢查預設手機末四碼
+                                            expected_temp = get_temp_pw_hash(password)
+                                            if expected_temp == user_data.get("temp_pw_hash"):
+                                                valid = True
+                                        
+                                        if valid:
+                                            st.session_state.cloud_id     = cloud_id
+                                            st.session_state.trend_data   = user_data.get("trend_data")
+                                            st.session_state.last_updated = user_data.get("last_updated")
+                                            st.session_state.display_name = user_data.get("display_name", "")
+                                            st.session_state.historical_reports = user_data.get("historical_reports", [])
+                                            st.session_state.logged_in    = True
+                                            st.rerun()
+                                        else:
+                                            st.error("密碼錯誤，請重新輸入。")
+                                    else:
+                                        st.error("找不到相符的資料，請確認輸入是否正確。")
+                                except Exception as e:
+                                    st.error(f"系統連線錯誤：{e}")
+                
+                if st.button("忘記密碼？", key="btn_forgot"):
+                    st.session_state.forgot_pw_mode = True
+                    st.rerun()
+
+            else:
+                # ── Forgot Password Form ──
+                with st.form("forgot_pw_form"):
+                    st.markdown(f"""
+                    <div>
+                        <div class="login-icon">🔑</div>
+                        <div class="login-title">重設密碼</div>
+                        <div class="login-sub">請驗證身分資料以重設您的密碼</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    national_id = st.text_input("身分證字號", placeholder="例如：A123456789")
+                    birth_year  = st.number_input("出生西元年 (例如 1960)", min_value=1900, max_value=2025, step=1, value=1970)
+                    new_pw      = st.text_input("設定新密碼 (至少 6 碼)", type="password")
+                    new_pw2     = st.text_input("再次輸入新密碼", type="password")
+                    submitted   = st.form_submit_button("確認重設密碼", use_container_width=True, type="primary")
+
+                    if submitted:
+                        if len(new_pw) < 6:
+                            st.error("新密碼長度不足。")
+                        elif new_pw != new_pw2:
+                            st.error("兩次輸入的密碼不相符。")
+                        else:
+                            cloud_id = get_hash_id(national_id)
+                            resp = supabase.table("cloud_patients").select("birth_year").eq("cloud_id", cloud_id).execute()
+                            if resp.data and resp.data[0]["birth_year"] == int(birth_year):
+                                hashed, salt = _hash_password(new_pw)
+                                supabase.table("cloud_patients").update({
+                                    "password_hash": hashed,
+                                    "salt": salt
+                                }).eq("cloud_id", cloud_id).execute()
+                                st.success("✅ 密碼重設成功！請重新登入。")
+                                st.session_state.forgot_pw_mode = False
+                            else:
+                                st.error("驗證資料不符，請確認身分證與出生年份。")
+                
+                if st.button("返回登入", key="btn_back"):
+                    st.session_state.forgot_pw_mode = False
+                    st.rerun()
+
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════
@@ -688,8 +773,48 @@ if st.session_state.historical_reports:
             out_md = r.get('final_output', '')
             # 將 a. b. c. 轉換為無序列表的 -，以便 Streamlit markdown 正確渲染第二層級
             out_md = re.sub(r'^(\s+)[a-zA-Z]\.\s+', r'\1- ', out_md, flags=re.MULTILINE)
-            st.markdown(out_md)
+            st.markdown(out_md, unsafe_allow_html=True)
             
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Account Settings ─────────────────────────────────────────────────────────
+with st.expander("⚙️ 帳號密碼設定"):
+    st.markdown('<div style="padding: 10px 0;">', unsafe_allow_html=True)
+    with st.form("change_pw_form_dash"):
+        st.markdown("##### 修改登入密碼")
+        curr_pw = st.text_input("輸入目前密碼", type="password")
+        new_pw  = st.text_input("輸入新密碼 (至少 6 碼)", type="password")
+        new_pw2 = st.text_input("再次輸入新密碼", type="password")
+        submitted = st.form_submit_button("確認修改", type="primary")
+        
+        if submitted:
+            if len(new_pw) < 6:
+                st.error("新密碼長度不足。")
+            elif new_pw != new_pw2:
+                st.error("兩次輸入的密碼不相符。")
+            else:
+                # 驗證目前密碼
+                cloud_id = st.session_state.cloud_id
+                resp = supabase.table("cloud_patients").select("*").eq("cloud_id", cloud_id).execute()
+                if resp.data:
+                    user_data = resp.data[0]
+                    valid = False
+                    if user_data.get("password_hash"):
+                        valid = verify_custom_password(curr_pw, user_data["password_hash"], user_data.get("salt", ""))
+                    else:
+                        expected_temp = get_temp_pw_hash(curr_pw)
+                        if expected_temp == user_data.get("temp_pw_hash"):
+                            valid = True
+                    
+                    if valid:
+                        hashed, salt = _hash_password(new_pw)
+                        supabase.table("cloud_patients").update({
+                            "password_hash": hashed,
+                            "salt": salt
+                        }).eq("cloud_id", cloud_id).execute()
+                        st.success("✅ 密碼修改成功！")
+                    else:
+                        st.error("目前密碼驗證失敗。")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────

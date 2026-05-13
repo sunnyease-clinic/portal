@@ -567,7 +567,7 @@ if not st.session_state.logged_in:
                     </div>
                     """, unsafe_allow_html=True)
                     national_id   = st.text_input("身分證字號", placeholder="例如：A123456789")
-                    password      = st.text_input("密碼", placeholder="請輸入密碼", type="password")
+                    password      = st.text_input("密碼", placeholder="請輸入密碼(預設為手機末四碼)", type="password")
                     submitted     = st.form_submit_button("🔓 登入並查看報告", use_container_width=True, type="primary")
                     
                     if submitted:

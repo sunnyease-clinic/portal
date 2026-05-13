@@ -621,7 +621,7 @@ if not st.session_state.logged_in:
                     </div>
                     """, unsafe_allow_html=True)
                     national_id = st.text_input("身分證字號", placeholder="例如：A123456789")
-                    birth_year  = st.number_input("出生西元年 (例如 1960)", min_value=1900, max_value=2025, step=1, value=1970)
+                    birth_date  = st.date_input("出生年月日", min_value=datetime(1900, 1, 1), max_value=datetime.now())
                     new_pw      = st.text_input("設定新密碼 (至少 6 碼)", type="password")
                     new_pw2     = st.text_input("再次輸入新密碼", type="password")
                     submitted   = st.form_submit_button("確認重設密碼", use_container_width=True, type="primary")
@@ -633,17 +633,22 @@ if not st.session_state.logged_in:
                             st.error("兩次輸入的密碼不相符。")
                         else:
                             cloud_id = get_hash_id(national_id)
-                            resp = supabase.table("cloud_patients").select("birth_year").eq("cloud_id", cloud_id).execute()
-                            if resp.data and resp.data[0]["birth_year"] == int(birth_year):
-                                hashed, salt = _hash_password(new_pw)
-                                supabase.table("cloud_patients").update({
-                                    "password_hash": hashed,
-                                    "salt": salt
-                                }).eq("cloud_id", cloud_id).execute()
-                                st.success("✅ 密碼重設成功！請重新登入。")
-                                st.session_state.forgot_pw_mode = False
+                            # 驗證身分證與完整生日
+                            resp = supabase.table("cloud_patients").select("birth_date").eq("cloud_id", cloud_id).execute()
+                            if resp.data:
+                                db_birth = str(resp.data[0].get("birth_date", ""))
+                                if db_birth == birth_date.strftime("%Y-%m-%d"):
+                                    hashed, salt = _hash_password(new_pw)
+                                    supabase.table("cloud_patients").update({
+                                        "password_hash": hashed,
+                                        "salt": salt
+                                    }).eq("cloud_id", cloud_id).execute()
+                                    st.success("✅ 密碼重設成功！請重新登入。")
+                                    st.session_state.forgot_pw_mode = False
+                                else:
+                                    st.error("驗證資料不符，請確認身分證與出生年月日。")
                             else:
-                                st.error("驗證資料不符，請確認身分證與出生年份。")
+                                st.error("找不到相符的帳號資料。")
                 
                 if st.button("返回登入", key="btn_back"):
                     st.session_state.forgot_pw_mode = False

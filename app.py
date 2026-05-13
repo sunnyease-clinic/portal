@@ -193,17 +193,17 @@ def inject_css(t):
 
     /* ── Expander (Historical Reports) ── */
     div[data-testid="stExpanderDetails"] p,
-    div[data-testid="stExpanderDetails"] li {
+    div[data-testid="stExpanderDetails"] li {{
         font-size: 1.08rem;
         line-height: 1.75;
         color: {t['text']};
-    }
-    div[data-testid="stExpanderDetails"] mark {
+    }}
+    div[data-testid="stExpanderDetails"] mark {{
         background-color: rgba(255, 217, 61, 0.35);
         color: inherit;
         border-radius: 4px;
         padding: 0 4px;
-    }
+    }}
 
     /* ── RWD: charts grid ── */
     .charts-grid {{

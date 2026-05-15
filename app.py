@@ -297,6 +297,16 @@ def verify_custom_password(plain: str, stored_hash: str, salt: str) -> bool:
     h, _ = _hash_password(plain, salt)
     return h == stored_hash
 
+def log_access(cloud_id: str, display_name: str, action: str):
+    try:
+        supabase.table("cloud_access_logs").insert({
+            "cloud_id": cloud_id,
+            "display_name": display_name,
+            "action": action
+        }).execute()
+    except Exception:
+        pass  # 避免 log 失敗影響使用者主流程
+
 @st.cache_data(ttl=300)
 def load_clinical_rules() -> dict:
     try:
@@ -598,6 +608,7 @@ if not st.session_state.logged_in:
                                             st.session_state.display_name = user_data.get("display_name", "")
                                             st.session_state.historical_reports = user_data.get("historical_reports", [])
                                             st.session_state.logged_in    = True
+                                            log_access(cloud_id, user_data.get("display_name", ""), "登入成功")
                                             st.rerun()
                                         else:
                                             st.error("密碼錯誤，請重新輸入。")
@@ -643,6 +654,7 @@ if not st.session_state.logged_in:
                                         "password_hash": hashed,
                                         "salt": salt
                                     }).eq("cloud_id", cloud_id).execute()
+                                    log_access(cloud_id, "", "重設密碼成功")
                                     st.success("✅ 密碼重設成功！請重新登入。")
                                     st.session_state.forgot_pw_mode = False
                                 else:
@@ -817,6 +829,7 @@ with st.expander("⚙️ 帳號密碼設定"):
                             "password_hash": hashed,
                             "salt": salt
                         }).eq("cloud_id", cloud_id).execute()
+                        log_access(cloud_id, st.session_state.display_name, "修改密碼成功")
                         st.success("✅ 密碼修改成功！")
                     else:
                         st.error("目前密碼驗證失敗。")

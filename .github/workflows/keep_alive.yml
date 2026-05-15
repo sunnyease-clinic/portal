@@ -11,5 +11,5 @@ jobs:
     steps:
       - name: Wake up Streamlit
         run: |
-          curl -sL https://sunnyease.streamlit.app/ > /dev/null
+          curl -I -k https://sunnyease.streamlit.app/ || true
           echo "Pinged at $(date)"

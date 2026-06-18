@@ -342,9 +342,9 @@ BASE_GROUPS = [
         "title": "🥗 1. 營養與代謝",
         "metrics": [
             {"key": "09038C", "label": "白蛋白 (Albumin)",     "unit": "g/dL",  "rule_key": "albumin_target",   "target_range": (3.8, 5.0)},
-            {"key": "09002C", "label": "尿素氮 (BUN)",          "unit": "mg/dL", "target_range": None, "bun_mode": True},
-            {"key": "09015C", "label": "肌酸酐 (Creatinine)",   "unit": "mg/dL", "target_range": None},
-            {"key": "09022C", "label": "血鉀 (Potassium)",      "unit": "mEq/L", "rule_key": "potassium_target", "target_range": (3.5, 5.5)},
+            {"key": "URR",    "label": "尿素清除率 (URR%)",    "unit": "%",     "rule_key": "urr_target",       "target_range": (65.0, None)},
+            {"key": "eKtV",   "label": "估計透析清除率 (eKt/V)","unit": "",      "rule_key": "ktv_target",       "target_range": (1.2, None)},
+            {"key": "09022C", "label": "血鉀 (Potassium)",      "unit": "mmol/L", "rule_key": "potassium_target", "target_range": (3.5, 5.5)},
         ],
     },
     {
@@ -400,13 +400,13 @@ PALETTE = ["#4ECDC4", "#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF", "#F2A65A", "#C
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 def evaluate_status(value: float, lo, hi) -> str:
-    if lo is not None and hi is not None:
-        if value < lo:   return "偏低"
-        if value > hi:   return "偏高"
-        return "達標"
-    if hi is not None and value > hi:  return "偏高"
-    if lo is not None and value < lo:  return "偏低"
-    return ""
+    if lo is None and hi is None:
+        return ""
+    if lo is not None and value < lo:
+        return "偏低"
+    if hi is not None and value > hi:
+        return "偏高"
+    return "達標"
 
 def status_class(s: str) -> str:
     return {"達標": "status-good", "偏高": "status-high", "偏低": "status-low"}.get(s, "")
@@ -507,17 +507,27 @@ def build_chart(metric, data: pd.DataFrame, color: str, t: dict):
         series_for_comment = agg["value"]
 
     # Target range shading
-    if lo is not None and hi is not None:
-        annot_txt = f"目標 <{hi}" if lo == 0 else f"目標 {lo}\u2013{hi}"
-        fig.add_hrect(y0=lo, y1=hi,
+    if lo is not None or hi is not None:
+        rect_y0 = lo if lo is not None else -99999.0
+        rect_y1 = hi if hi is not None else 99999.0
+        if lo is not None and hi is not None:
+            annot_txt = f"目標 <{hi}" if lo == 0 else f"目標 {lo}\u2013{hi}"
+            pos = "top left"
+        elif lo is not None:
+            annot_txt = f"目標 ≥{lo}"
+            pos = "bottom left"
+        else:
+            annot_txt = f"目標 ≤{hi}"
+            pos = "top left"
+        fig.add_hrect(y0=rect_y0, y1=rect_y1,
                       fillcolor="rgba(78,205,196,0.10)", line_width=0,
                       annotation_text=annot_txt,
-                      annotation_position="top left",
+                      annotation_position=pos,
                       annotation_font_size=10,
                       annotation_font_color=t["accent"])
 
-    v_min = min(all_y + ([lo] if lo else []))
-    v_max = max(all_y + ([hi] if hi else []))
+    v_min = min(all_y + ([lo] if lo is not None else []))
+    v_max = max(all_y + ([hi] if hi is not None else []))
     span  = max(v_max - v_min, 2.0)
     fig.update_layout(
         height=230,

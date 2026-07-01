@@ -191,6 +191,50 @@ def inject_css(t):
         margin-bottom: 1.5rem;
     }}
 
+    /* ── Expiry badges ── */
+    .expiry-badge-safe {{
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        color: #22c55e;
+        border-radius: 999px;
+        padding: 4px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        margin-left: 0.5rem;
+    }}
+    .expiry-badge-warning {{
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(249, 115, 22, 0.12);
+        border: 1px solid rgba(249, 115, 22, 0.3);
+        color: #f97316;
+        border-radius: 999px;
+        padding: 4px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        margin-left: 0.5rem;
+    }}
+    .expiry-badge-urgent {{
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #ef4444;
+        border-radius: 999px;
+        padding: 4px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        margin-left: 0.5rem;
+        animation: pulse-border 2s infinite;
+    }}
+    @keyframes pulse-border {{
+        0% {{ box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }}
+        70% {{ box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
+    }}
+
     /* ── Expander (Historical Reports) ── */
     div[data-testid="stExpanderDetails"] p,
     div[data-testid="stExpanderDetails"] li {{
@@ -410,6 +454,25 @@ def evaluate_status(value: float, lo, hi) -> str:
 
 def status_class(s: str) -> str:
     return {"達標": "status-good", "偏高": "status-high", "偏低": "status-low"}.get(s, "")
+
+def get_remaining_time_str(expires_at) -> tuple[str, str]:
+    now = datetime.now(expires_at.tzinfo)
+    diff = expires_at - now
+    total_seconds = diff.total_seconds()
+    
+    if total_seconds <= 0:
+        return "已過期", "expired"
+        
+    days = diff.days
+    hours = diff.seconds // 3600
+    minutes = (diff.seconds % 3600) // 60
+    
+    if days >= 1:
+        return f"剩餘 {days} 天 {hours} 小時", "safe"
+    elif hours >= 2:
+        return f"剩餘 {hours} 小時 {minutes} 分鐘", "warning"
+    else:
+        return f"即將於 {minutes} 分鐘內失效！", "urgent"
 
 def generate_comment_html(metrics_with_data: list) -> str:
     lines = []
@@ -631,6 +694,17 @@ if st.session_state.share_mode and not st.session_state.share_verified:
                     <div class="login-sub">請輸入本交班名單中任一病患的出生年份以進行解鎖</div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                if st.session_state.share_expires:
+                    remaining_str, style_type = get_remaining_time_str(st.session_state.share_expires)
+                    expires_str = st.session_state.share_expires.strftime("%Y-%m-%d %H:%M")
+                    st.markdown(f"""
+                    <div style="text-align: center; margin-bottom: 1.2rem; font-size: 0.88rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 10px;">
+                        ⏰ 連結有效期限：<span style="font-weight: 600; color: {t['accent']};">{expires_str}</span><br>
+                        <span class="expiry-badge-{style_type}" style="margin: 8px 0 0; display: inline-flex; margin-left: 0;">⏳ {remaining_str}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
                 year_input = st.text_input("出生年份 (民國或西元皆可，如 54 或 1965)", placeholder="例如：1965 或 54")
                 submitted = st.form_submit_button("🔓 驗證並解鎖", use_container_width=True, type="primary")
                 
@@ -852,7 +926,13 @@ with hdr_right:
 # ── Update badge ─────────────────────────────────────────────────────────────
 try:
     last_updated = datetime.fromisoformat(last_updated_val).strftime('%Y-%m-%d %H:%M')
-    st.markdown(f'<span class="update-badge">🔄 資料最後更新：{last_updated}</span>', unsafe_allow_html=True)
+    badges_html = f'<span class="update-badge">🔄 資料最後更新：{last_updated}</span>'
+    
+    if st.session_state.share_mode and st.session_state.share_expires:
+        remaining_str, style_type = get_remaining_time_str(st.session_state.share_expires)
+        badges_html += f'<span class="expiry-badge-{style_type}">⏰ 連結效期：{remaining_str}</span>'
+        
+    st.markdown(badges_html, unsafe_allow_html=True)
 except Exception:
     pass
 

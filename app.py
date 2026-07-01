@@ -939,44 +939,44 @@ if historical_reports:
 # ── Account Settings ─────────────────────────────────────────────────────────
 if not st.session_state.share_mode:
     with st.expander("⚙️ 帳號密碼設定"):
-    st.markdown('<div style="padding: 10px 0;">', unsafe_allow_html=True)
-    with st.form("change_pw_form_dash"):
-        st.markdown("##### 修改登入密碼")
-        curr_pw = st.text_input("輸入目前密碼", type="password")
-        new_pw  = st.text_input("輸入新密碼 (至少 6 碼)", type="password")
-        new_pw2 = st.text_input("再次輸入新密碼", type="password")
-        submitted = st.form_submit_button("確認修改", type="primary")
-        
-        if submitted:
-            if len(new_pw) < 6:
-                st.error("新密碼長度不足。")
-            elif new_pw != new_pw2:
-                st.error("兩次輸入的密碼不相符。")
-            else:
-                # 驗證目前密碼
-                cloud_id = st.session_state.cloud_id
-                resp = supabase.table("cloud_patients").select("*").eq("cloud_id", cloud_id).execute()
-                if resp.data:
-                    user_data = resp.data[0]
-                    valid = False
-                    if user_data.get("password_hash"):
-                        valid = verify_custom_password(curr_pw, user_data["password_hash"], user_data.get("salt", ""))
-                    else:
-                        expected_temp = get_temp_pw_hash(curr_pw)
-                        if expected_temp == user_data.get("temp_pw_hash"):
-                            valid = True
-                    
-                    if valid:
-                        hashed, salt = _hash_password(new_pw)
-                        supabase.table("cloud_patients").update({
-                            "password_hash": hashed,
-                            "salt": salt
-                        }).eq("cloud_id", cloud_id).execute()
-                        log_access(cloud_id, st.session_state.display_name, "修改密碼成功")
-                        st.success("✅ 密碼修改成功！")
-                    else:
-                        st.error("目前密碼驗證失敗。")
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div style="padding: 10px 0;">', unsafe_allow_html=True)
+        with st.form("change_pw_form_dash"):
+            st.markdown("##### 修改登入密碼")
+            curr_pw = st.text_input("輸入目前密碼", type="password")
+            new_pw  = st.text_input("輸入新密碼 (至少 6 碼)", type="password")
+            new_pw2 = st.text_input("再次輸入新密碼", type="password")
+            submitted = st.form_submit_button("確認修改", type="primary")
+            
+            if submitted:
+                if len(new_pw) < 6:
+                    st.error("新密碼長度不足。")
+                elif new_pw != new_pw2:
+                    st.error("兩次輸入的密碼不相符。")
+                else:
+                    # 驗證目前密碼
+                    cloud_id = st.session_state.cloud_id
+                    resp = supabase.table("cloud_patients").select("*").eq("cloud_id", cloud_id).execute()
+                    if resp.data:
+                        user_data = resp.data[0]
+                        valid = False
+                        if user_data.get("password_hash"):
+                            valid = verify_custom_password(curr_pw, user_data["password_hash"], user_data.get("salt", ""))
+                        else:
+                            expected_temp = get_temp_pw_hash(curr_pw)
+                            if expected_temp == user_data.get("temp_pw_hash"):
+                                valid = True
+                        
+                        if valid:
+                            hashed, salt = _hash_password(new_pw)
+                            supabase.table("cloud_patients").update({
+                                "password_hash": hashed,
+                                "salt": salt
+                            }).eq("cloud_id", cloud_id).execute()
+                            log_access(cloud_id, st.session_state.display_name, "修改密碼成功")
+                            st.success("✅ 密碼修改成功！")
+                        else:
+                            st.error("目前密碼驗證失敗。")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown(f"""

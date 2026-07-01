@@ -560,13 +560,106 @@ if "logged_in" not in st.session_state:
     st.session_state.historical_reports = None
     st.session_state.forgot_pw_mode = False
 
+if "share_mode" not in st.session_state:
+    st.session_state.share_mode = False
+    st.session_state.share_patients = []
+    st.session_state.share_verified = False
+    st.session_state.share_expires = None
+    st.session_state.share_birth_years = []
+    st.session_state.share_require_verification = True
+
+# ─── Share URL Parameter Intercept ──────────────────────────────────────────
+query_params = st.query_params
+share_id = query_params.get("share", None)
+
+if share_id and not st.session_state.share_mode and not st.session_state.logged_in:
+    try:
+        resp = supabase.table("cloud_shares").select("*").eq("share_id", share_id).execute()
+        if resp.data:
+            share_record = resp.data[0]
+            expires_at_str = share_record["expires_at"]
+            expires_at = datetime.fromisoformat(expires_at_str)
+            now_tz = datetime.now(expires_at.tzinfo)
+            
+            if expires_at > now_tz:
+                patient_ids = share_record["patient_ids"]
+                birth_years = share_record.get("birth_years", [])
+                require_verification = share_record.get("require_verification", True)
+                
+                patients_data = []
+                for cid in patient_ids:
+                    p_resp = supabase.table("cloud_patients").select("*").eq("cloud_id", cid).execute()
+                    if p_resp.data:
+                        patients_data.append(p_resp.data[0])
+                        
+                if patients_data:
+                    st.session_state.share_patients = patients_data
+                    st.session_state.share_expires = expires_at
+                    st.session_state.share_birth_years = birth_years
+                    st.session_state.share_require_verification = require_verification
+                    st.session_state.share_mode = True
+                    
+                    if not require_verification:
+                        st.session_state.share_verified = True
+                        
+                    log_access(share_id, "交班連結", f"點擊交班網址 (病患數: {len(patients_data)})")
+                else:
+                    st.error("此交班連結對應的病患資料在雲端未同步。")
+                    st.stop()
+            else:
+                st.warning("⏰ 此交班連結已過期，請聯絡主治醫師重新產生。")
+                st.stop()
+        else:
+            st.error("🔗 無效的交班連結。")
+            st.stop()
+    except Exception as e:
+        st.error(f"讀取分享資訊失敗: {e}")
+        st.stop()
+
+# ─── Share Mode Security Verification Gate ────────────────────────────────────
+if st.session_state.share_mode and not st.session_state.share_verified:
+    t = get_theme()
+    inject_css(t)
+    with st.container():
+        col1, col2, col3 = st.columns([1, 1.5, 1])
+        with col2:
+            with st.form("share_verify_form"):
+                st.markdown(f"""
+                <div>
+                    <div class="login-icon">🔒</div>
+                    <div class="login-title">安全驗證</div>
+                    <div class="login-sub">請輸入本交班名單中任一病患的出生年份以進行解鎖</div>
+                </div>
+                """, unsafe_allow_html=True)
+                year_input = st.text_input("出生年份 (民國或西元皆可，如 54 或 1965)", placeholder="例如：1965 或 54")
+                submitted = st.form_submit_button("🔓 驗證並解鎖", use_container_width=True, type="primary")
+                
+                if submitted:
+                    if not year_input:
+                        st.error("請輸入出生年份。")
+                    else:
+                        try:
+                            year = int(year_input.strip())
+                            if year < 200:
+                                year += 1911
+                            
+                            if year in st.session_state.share_birth_years:
+                                st.session_state.share_verified = True
+                                log_access(share_id, "交班連結", "驗證成功，解鎖儀表板")
+                                st.rerun()
+                            else:
+                                st.error("驗證失敗，年份不符。")
+                        except ValueError:
+                            st.error("請輸入有效的數字年份。")
+    st.stop()
+
 t = get_theme()
 inject_css(t)
 
 # ══════════════════════════════════════════════════════════════════════
 # LOGIN PAGE
 # ══════════════════════════════════════════════════════════════════════
-if not st.session_state.logged_in:
+if not st.session_state.logged_in and not (st.session_state.share_mode and st.session_state.share_verified):
     with st.container():
         col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
@@ -681,7 +774,32 @@ if not st.session_state.logged_in:
 # ══════════════════════════════════════════════════════════════════════
 # DASHBOARD (LOGGED IN)
 # ══════════════════════════════════════════════════════════════════════
-trend_data = st.session_state.trend_data
+if st.session_state.share_mode and st.session_state.share_verified:
+    patients = st.session_state.share_patients
+    
+    # 頂部顯示病患選取器
+    st.markdown('<div class="portal-wrap" style="padding-bottom: 0;">', unsafe_allow_html=True)
+    patient_names = {f"{p.get('display_name', '未知病患')}": idx for idx, p in enumerate(patients)}
+    selected_name = st.selectbox(
+        "📋 選擇交班病患",
+        options=list(patient_names.keys()),
+        key="share_patient_selector"
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    selected_idx = patient_names[selected_name]
+    current = patients[selected_idx]
+    
+    trend_data = current.get("trend_data", [])
+    display_name = current.get("display_name", "")
+    historical_reports = current.get("historical_reports", [])
+    last_updated_val = current.get("last_updated")
+else:
+    trend_data = st.session_state.trend_data
+    display_name = st.session_state.display_name
+    historical_reports = st.session_state.historical_reports
+    last_updated_val = st.session_state.last_updated
+
 if not trend_data:
     st.info("您目前沒有近期的檢驗紀錄。")
     st.stop()
@@ -695,7 +813,11 @@ if not df.empty and "visit_date" in df.columns:
 st.markdown('<div class="portal-wrap">', unsafe_allow_html=True)
 
 # ── Header ──────────────────────────────────────────────────────────────────
-greeting = f"{st.session_state.display_name}您好，" if st.session_state.display_name else ""
+if st.session_state.share_mode:
+    greeting = f"您正在以交班模式檢視 {display_name} 的資訊，"
+else:
+    greeting = f"{display_name}您好，" if display_name else ""
+
 hdr_left, hdr_right = st.columns([5, 1])
 with hdr_left:
     st.markdown(f"""
@@ -709,17 +831,27 @@ with hdr_right:
     if st.button(t["toggle_icon"], help=t["toggle_label"], key="theme_dash"):
         st.session_state.dark_mode = not st.session_state.dark_mode
         st.rerun()
-    if st.button("登出", key="logout_btn", use_container_width=True):
-        st.session_state.logged_in   = False
-        st.session_state.trend_data  = None
-        st.session_state.last_updated = None
-        st.session_state.display_name = None
-        st.session_state.historical_reports = None
-        st.rerun()
+    if st.session_state.share_mode:
+        if st.button("結束檢視", key="logout_btn", use_container_width=True):
+            st.session_state.share_mode = False
+            st.session_state.share_patients = []
+            st.session_state.share_verified = False
+            st.session_state.share_expires = None
+            st.session_state.share_birth_years = []
+            st.query_params.clear()
+            st.rerun()
+    else:
+        if st.button("登出", key="logout_btn", use_container_width=True):
+            st.session_state.logged_in   = False
+            st.session_state.trend_data  = None
+            st.session_state.last_updated = None
+            st.session_state.display_name = None
+            st.session_state.historical_reports = None
+            st.rerun()
 
 # ── Update badge ─────────────────────────────────────────────────────────────
 try:
-    last_updated = datetime.fromisoformat(st.session_state.last_updated).strftime('%Y-%m-%d %H:%M')
+    last_updated = datetime.fromisoformat(last_updated_val).strftime('%Y-%m-%d %H:%M')
     st.markdown(f'<span class="update-badge">🔄 資料最後更新：{last_updated}</span>', unsafe_allow_html=True)
 except Exception:
     pass
@@ -783,7 +915,7 @@ for group in get_groups():
     st.markdown('</div>', unsafe_allow_html=True)  # close group-card
 
 # ── Historical Reports ───────────────────────────────────────────────────────
-if st.session_state.historical_reports:
+if historical_reports:
     st.markdown(f"""
     <div class="group-card">
         <div class="group-header">
@@ -795,7 +927,7 @@ if st.session_state.historical_reports:
     """, unsafe_allow_html=True)
     
     import re
-    for r in st.session_state.historical_reports:
+    for r in historical_reports:
         with st.expander(f"📅 {r.get('report_month', '')}"):
             out_md = r.get('final_output', '')
             # 將 a. b. c. 轉換為無序列表的 -，以便 Streamlit markdown 正確渲染第二層級
@@ -805,7 +937,8 @@ if st.session_state.historical_reports:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Account Settings ─────────────────────────────────────────────────────────
-with st.expander("⚙️ 帳號密碼設定"):
+if not st.session_state.share_mode:
+    with st.expander("⚙️ 帳號密碼設定"):
     st.markdown('<div style="padding: 10px 0;">', unsafe_allow_html=True)
     with st.form("change_pw_form_dash"):
         st.markdown("##### 修改登入密碼")

@@ -467,12 +467,16 @@ def get_remaining_time_str(expires_at) -> tuple[str, str]:
     hours = diff.seconds // 3600
     minutes = (diff.seconds % 3600) // 60
     
-    if days >= 1:
+    if days >= 2:
         return f"剩餘 {days} 天 {hours} 小時", "safe"
-    elif hours >= 2:
-        return f"剩餘 {hours} 小時 {minutes} 分鐘", "warning"
+    elif days == 1:
+        return f"剩餘 {days} 天 {hours} 小時", "warning"
     else:
-        return f"即將於 {minutes} 分鐘內失效！", "urgent"
+        if hours >= 2:
+            return f"即將於 {hours} 小時 {minutes} 分鐘內失效", "urgent"
+        else:
+            return f"即將於 {minutes} 分鐘內失效！", "urgent"
+
 
 def generate_comment_html(metrics_with_data: list) -> str:
     lines = []

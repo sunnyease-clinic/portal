@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "./lib/api";
 import {
   getTarget,
@@ -385,7 +385,6 @@ function MetricCard({ metric, patient, rules }: { metric: Metric; patient: Patie
   return (
     <article
       className={`metric-card status-card-${status}`}
-      style={{ "--metric-color": metric.chartColor } as CSSProperties}
     >
       <div className="metric-topline">
         <div><h3>{metric.label}</h3><span>{metric.unit}</span></div>
@@ -478,7 +477,11 @@ function LoadingScreen() {
 }
 
 function ClinicLogo({ compact = false }: { compact?: boolean }) {
-  return <img className={`clinic-logo${compact ? " compact" : ""}`} src="/sunnyease-logo.png" alt="向怡診所 Sunnyease Clinic" />;
+  return (
+    <span className={`clinic-logo${compact ? " compact" : ""}`}>
+      <img src="/sunnyease-logo.png" alt="向怡診所標誌" />
+    </span>
+  );
 }
 
 function formatTarget(metric: Metric, [low, high]: [number | null, number | null]) {

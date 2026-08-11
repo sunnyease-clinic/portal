@@ -70,14 +70,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .public-brand span, .topbar-brand span { display: block; color: var(--muted); font-size: 0.86rem; margin-top: 3px; }
 .clinic-logo {
   display: block;
-  width: min(250px, 68vw);
-  height: auto;
-  padding: 7px 10px;
-  border-radius: 14px;
+  width: 74px;
+  height: 74px;
+  overflow: hidden;
+  border-radius: 18px;
   background: #fff;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
 }
-.clinic-logo.compact { width: 176px; padding: 4px 7px; border-radius: 10px; box-shadow: none; }
+.clinic-logo img { display: block; width: auto; max-width: none; height: 100%; }
+.clinic-logo.compact { width: 50px; height: 50px; border-radius: 13px; box-shadow: none; }
 .brand-mark {
   display: grid;
   place-items: center;
@@ -191,7 +192,6 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
   background: linear-gradient(150deg, color-mix(in srgb, var(--status-color) 6%, var(--surface)), var(--surface) 42%);
   box-shadow: inset 5px 0 0 var(--status-color), 0 9px 30px rgba(0, 0, 0, 0.07);
 }
-.metric-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--metric-color); opacity: 0.9; }
 .status-card-達標 { --status-color: var(--good); }
 .status-card-偏高 { --status-color: var(--danger); }
 .status-card-偏低 { --status-color: var(--low); }
@@ -234,7 +234,7 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
   .topbar { padding-inline: 14px; }
   .topbar-brand span { display: none; }
   .dashboard-content { width: min(100% - 22px, 1180px); padding-top: 24px; }
-  .clinic-logo.compact { width: 142px; }
+  .clinic-logo.compact { width: 44px; height: 44px; }
   .welcome-block { align-items: start; flex-direction: column; padding-bottom: 28px; }
   .metric-grid { grid-template-columns: 1fr; }
   .health-section { padding: 17px 12px; border-radius: 21px; }

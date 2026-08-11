@@ -35,10 +35,10 @@ export default function TrendChart({ points, target, metric, min, max, padding }
           tick={{ fontSize: 11, fill: "var(--muted)" }}
         />
         {lowTarget !== null && highTarget !== null && (
-          <ReferenceArea y1={lowTarget} y2={highTarget} fill={metric.chartColor} fillOpacity={0.1} />
+          <ReferenceArea y1={lowTarget} y2={highTarget} fill="var(--accent)" fillOpacity={0.1} />
         )}
-        {lowTarget !== null && <ReferenceLine y={lowTarget} stroke={metric.chartColor} strokeDasharray="5 4" strokeOpacity={0.75} />}
-        {highTarget !== null && <ReferenceLine y={highTarget} stroke={metric.chartColor} strokeDasharray="5 4" strokeOpacity={0.75} />}
+        {lowTarget !== null && <ReferenceLine y={lowTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
+        {highTarget !== null && <ReferenceLine y={highTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
         <Tooltip
           labelFormatter={(label) => `日期 ${label}`}
           formatter={(value) => [`${Number(value).toFixed(1)} ${metric.unit}`, metric.label]}
@@ -47,10 +47,10 @@ export default function TrendChart({ points, target, metric, min, max, padding }
         <Line
           type="monotone"
           dataKey="value"
-          stroke={metric.chartColor}
+          stroke="var(--accent)"
           strokeWidth={3}
-          dot={{ r: 4, fill: metric.chartColor, stroke: "var(--surface)", strokeWidth: 2 }}
-          activeDot={{ r: 6, fill: metric.chartColor }}
+          dot={{ r: 4, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }}
+          activeDot={{ r: 6, fill: "var(--accent)" }}
         />
       </LineChart>
     </ResponsiveContainer>

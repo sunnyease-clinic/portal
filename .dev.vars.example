@@ -1,0 +1,7 @@
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_REPLACE_ME
+SUPABASE_ANON_KEY=sb_publishable_REPLACE_ME
+PORTAL_SESSION_SECRET=replace-with-at-least-32-random-bytes
+PORTAL_BFF_SECRET=replace-with-a-different-random-secret
+TURNSTILE_SECRET_KEY=
+PORTAL_SESSION_TTL_SECONDS=28800

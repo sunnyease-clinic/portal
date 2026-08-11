@@ -1,0 +1,99 @@
+import type { ClinicalRule, TrendPoint } from "./types";
+
+export type Metric = {
+  key: string;
+  label: string;
+  unit: string;
+  ruleKey: string;
+  fallback: [number | null, number | null];
+};
+
+export type MetricGroup = {
+  id: string;
+  title: string;
+  metrics: Metric[];
+};
+
+export type ChartPoint = { date: string; value: number };
+
+export const METRIC_GROUPS: MetricGroup[] = [
+  {
+    id: "nutrition",
+    title: "營養與代謝",
+    metrics: [
+      { key: "09038C", label: "白蛋白 Albumin", unit: "g/dL", ruleKey: "albumin_target", fallback: [3.8, 5] },
+      { key: "URR", label: "尿素清除率 URR", unit: "%", ruleKey: "urr_target", fallback: [65, null] },
+      { key: "eKtV", label: "透析清除率 eKt/V", unit: "", ruleKey: "ktv_target", fallback: [1.2, null] },
+      { key: "09022C", label: "血鉀 Potassium", unit: "mmol/L", ruleKey: "potassium_target", fallback: [3.5, 5.5] },
+    ],
+  },
+  {
+    id: "ckd-mbd",
+    title: "鈣磷代謝",
+    metrics: [
+      { key: "09012C", label: "血磷 Phosphorus", unit: "mg/dL", ruleKey: "phosphorus_target", fallback: [3.5, 5.5] },
+      { key: "09011C", label: "血鈣 Calcium", unit: "mg/dL", ruleKey: "calcium_target", fallback: [8.4, 10.2] },
+      { key: "CaP_product", label: "鈣磷乘積 Ca × P", unit: "", ruleKey: "ca_p_product_target", fallback: [0, 55] },
+      { key: "09122C", label: "副甲狀腺素 i-PTH", unit: "pg/mL", ruleKey: "intact-PTH", fallback: [150, 600] },
+      { key: "09027C", label: "鹼性磷酸酶 ALP", unit: "U/L", ruleKey: "alp_target", fallback: [40, 130] },
+    ],
+  },
+  {
+    id: "anemia",
+    title: "造血與鐵質",
+    metrics: [
+      { key: "08003C", label: "血色素 Hb", unit: "g/dL", ruleKey: "hb_target_dialysis", fallback: [10, 11.5] },
+      { key: "12116C", label: "鐵蛋白 Ferritin", unit: "ng/mL", ruleKey: "ferritin_target", fallback: [200, 800] },
+      { key: "Tsat", label: "鐵飽和度 TSAT", unit: "%", ruleKey: "tsat_target", fallback: [20, 50] },
+    ],
+  },
+];
+
+export function parseRule(value: string): [number | null, number | null] | null {
+  const normalized = value.trim().replace(/\s/g, "");
+  const range = normalized.match(/^(-?\d+(?:\.\d+)?)[–~-](-?\d+(?:\.\d+)?)$/);
+  if (range) return [Number(range[1]), Number(range[2])];
+  const upper = normalized.match(/^<=(\d+(?:\.\d+)?)$/) ?? normalized.match(/^<(\d+(?:\.\d+)?)$/);
+  if (upper) return [null, Number(upper[1])];
+  const lower = normalized.match(/^>=(\d+(?:\.\d+)?)$/) ?? normalized.match(/^>(\d+(?:\.\d+)?)$/);
+  if (lower) return [Number(lower[1]), null];
+  return null;
+}
+
+export function getTarget(metric: Metric, rules: ClinicalRule[]): [number | null, number | null] {
+  const rule = rules.find((item) => item.rule_key === metric.ruleKey);
+  return (rule && parseRule(rule.rule_value)) || metric.fallback;
+}
+
+export function pointsForMetric(data: TrendPoint[], metricKey: string): ChartPoint[] {
+  const grouped = new Map<string, number[]>();
+  for (const point of data) {
+    if (point.nhi_code !== metricKey) continue;
+    const numeric = Number(point.test_result_numeric);
+    if (!Number.isFinite(numeric) || !point.visit_date) continue;
+    const date = point.visit_date.slice(0, 10);
+    grouped.set(date, [...(grouped.get(date) ?? []), numeric]);
+  }
+  return [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, values]) => ({
+      date,
+      value: values.reduce((sum, item) => sum + item, 0) / values.length,
+    }));
+}
+
+export function statusFor(value: number, target: [number | null, number | null]): "達標" | "偏高" | "偏低" {
+  const [low, high] = target;
+  if (low !== null && value < low) return "偏低";
+  if (high !== null && value > high) return "偏高";
+  return "達標";
+}
+
+export function trendLabel(points: ChartPoint[]): string {
+  if (points.length < 2) return "";
+  const latest = points.at(-1)!.value;
+  const previous = points.at(-2)!.value;
+  const difference = latest - previous;
+  if (Math.abs(difference) < Math.max(Math.abs(latest) * 0.01, 0.001)) return "→ 穩定";
+  return difference > 0 ? `↑ +${difference.toFixed(1)}` : `↓ ${difference.toFixed(1)}`;
+}

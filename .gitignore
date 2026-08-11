@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.env
+.env.local
+*.tsbuildinfo
+__pycache__/
+*.pyc
+desktop.ini
+.devcontainer/desktop.ini
+.github/desktop.ini
+.github/workflows/desktop.ini

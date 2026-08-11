@@ -13,12 +13,14 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-markdown": "latest",
     "recharts": "latest",
-    "remark-gfm": "latest"
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "latest",
+    "vite": "latest"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "latest",

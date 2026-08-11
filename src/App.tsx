@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { api } from "./lib/api";
 import {
   getTarget,
@@ -123,11 +123,8 @@ function PublicShell({ children, dark, onTheme }: { children: ReactNode; dark: b
         {dark ? "☀" : "☾"}
       </button>
       <div className="public-brand">
-        <div className="brand-mark">向</div>
-        <div>
-          <p>向怡診所</p>
-          <span>個人健康趨勢儀表板</span>
-        </div>
+        <ClinicLogo />
+        <span>個人健康趨勢儀表板</span>
       </div>
       {children}
       <p className="public-footer">您的資料經加密連線傳輸，請勿在公用裝置儲存密碼。</p>
@@ -277,8 +274,8 @@ function DashboardShell({ children, dark, onTheme, onLogout, shareMode = false }
     <main className="dashboard-page">
       <header className="topbar">
         <div className="topbar-brand">
-          <div className="brand-mark small">向</div>
-          <div><strong>向怡診所</strong><span>個人健康趨勢儀表板</span></div>
+          <ClinicLogo compact />
+          <span>個人健康趨勢儀表板</span>
         </div>
         <div className="topbar-actions">
           <button className="theme-button" onClick={onTheme} aria-label={dark ? "切換亮色模式" : "切換深色模式"}>{dark ? "☀" : "☾"}</button>
@@ -350,10 +347,13 @@ function PatientView({ patient, rules, shareMode = false }: { patient: PatientDa
       </section>
 
       {METRIC_GROUPS.map((group, index) => (
-        <section className="health-section" key={group.id}>
+        <section className={`health-section section-${group.id}`} key={group.id}>
           <div className="section-heading">
             <span className="section-number">{String(index + 1).padStart(2, "0")}</span>
-            <h2>{group.title}</h2>
+            <div>
+              <h2>{group.title}</h2>
+              <p>{group.description}</p>
+            </div>
           </div>
           <div className="metric-grid">
             {group.metrics.map((metric) => (
@@ -383,10 +383,13 @@ function MetricCard({ metric, patient, rules }: { metric: Metric; patient: Patie
   const padding = Math.max((max - min) * 0.3, 1);
 
   return (
-    <article className="metric-card">
+    <article
+      className={`metric-card status-card-${status}`}
+      style={{ "--metric-color": metric.chartColor } as CSSProperties}
+    >
       <div className="metric-topline">
         <div><h3>{metric.label}</h3><span>{metric.unit}</span></div>
-        <span className={`status status-${status}`}>{status}</span>
+        <span className={`status status-${status}`}>{status === "達標" ? "✓ 達標" : status === "偏高" ? "↑ 偏高" : "↓ 偏低"}</span>
       </div>
       <div className="latest-row">
         <strong>{latest.toFixed(1)}</strong>
@@ -397,7 +400,7 @@ function MetricCard({ metric, patient, rules }: { metric: Metric; patient: Patie
           <TrendChart points={points} target={target} metric={metric} min={min} max={max} padding={padding} />
         </Suspense>
       </div>
-      <p className="target-label">目標 {formatTarget(target)} {metric.unit}</p>
+      <p className="target-label"><span>建議區間</span><strong>{formatTarget(metric, target)}{metric.targetHint ? "" : metric.unit ? ` ${metric.unit}` : ""}</strong></p>
     </article>
   );
 }
@@ -471,10 +474,15 @@ function PasswordPanel() {
 }
 
 function LoadingScreen() {
-  return <main className="loading-screen"><div className="brand-mark">向</div><span>正在安全載入…</span></main>;
+  return <main className="loading-screen"><ClinicLogo compact /><span>正在安全載入…</span></main>;
 }
 
-function formatTarget([low, high]: [number | null, number | null]) {
+function ClinicLogo({ compact = false }: { compact?: boolean }) {
+  return <img className={`clinic-logo${compact ? " compact" : ""}`} src="/sunnyease-logo.png" alt="向怡診所 Sunnyease Clinic" />;
+}
+
+function formatTarget(metric: Metric, [low, high]: [number | null, number | null]) {
+  if (metric.targetHint) return metric.targetHint;
   if (low !== null && high !== null) return `${low}–${high}`;
   if (low !== null) return `≥ ${low}`;
   if (high !== null) return `≤ ${high}`;

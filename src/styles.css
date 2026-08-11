@@ -18,6 +18,7 @@
   --danger: #ff8b85;
   --warning: #ffc66b;
   --good: #6ce2a3;
+  --low: #77aaff;
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
 }
 
@@ -38,6 +39,7 @@
   --danger: #c9403b;
   --warning: #a96300;
   --good: #177c50;
+  --low: #245fc4;
   --shadow: 0 20px 50px rgba(16, 65, 52, 0.12);
 }
 
@@ -64,8 +66,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 
 .public-brand, .topbar-brand { display: flex; align-items: center; gap: 14px; }
-.public-brand p { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: 0.05em; }
+.public-brand { flex-direction: column; gap: 10px; }
 .public-brand span, .topbar-brand span { display: block; color: var(--muted); font-size: 0.86rem; margin-top: 3px; }
+.clinic-logo {
+  display: block;
+  width: min(250px, 68vw);
+  height: auto;
+  padding: 7px 10px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+.clinic-logo.compact { width: 176px; padding: 4px 7px; border-radius: 10px; box-shadow: none; }
 .brand-mark {
   display: grid;
   place-items: center;
@@ -149,26 +161,54 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
 .share-toolbar label { color: var(--text); }
 .share-toolbar .expiry-pill { justify-self: end; }
 
-.health-section { margin: 0 0 46px; }
-.section-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 18px; }
+.health-section {
+  --section-color: var(--accent);
+  margin: 0 0 34px;
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--section-color) 30%, var(--border));
+  border-radius: 26px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--section-color) 8%, var(--surface-soft)), var(--surface-soft) 46%);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.08);
+}
+.section-nutrition { --section-color: #f59e0b; }
+.section-ckd-mbd { --section-color: #8b5cf6; }
+.section-anemia { --section-color: #e11d48; }
+.reports-section { --section-color: #0ea5e9; }
+.section-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
 .section-heading h2 { margin: 0; font-size: 1.45rem; }
-.section-number { display: grid; place-items: center; min-width: 36px; height: 30px; padding: 0 8px; border-radius: 9px; color: var(--accent-strong); background: var(--surface-raised); font-size: 0.76rem; font-weight: 800; }
+.section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 0.82rem; }
+.section-number { display: grid; place-items: center; min-width: 42px; height: 42px; padding: 0 8px; border-radius: 13px; color: #fff; background: var(--section-color); font-size: 0.82rem; font-weight: 900; box-shadow: 0 8px 20px color-mix(in srgb, var(--section-color) 25%, transparent); }
 .section-description { color: var(--muted); margin: -8px 0 18px 49px; }
 .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.metric-card { min-width: 0; padding: 20px; border-radius: 22px; border: 1px solid var(--border); background: var(--surface); box-shadow: 0 9px 30px rgba(0, 0, 0, 0.07); }
+.metric-card {
+  --status-color: var(--good);
+  position: relative;
+  min-width: 0;
+  padding: 20px;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--status-color) 32%, var(--border));
+  background: linear-gradient(150deg, color-mix(in srgb, var(--status-color) 6%, var(--surface)), var(--surface) 42%);
+  box-shadow: inset 5px 0 0 var(--status-color), 0 9px 30px rgba(0, 0, 0, 0.07);
+}
+.metric-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--metric-color); opacity: 0.9; }
+.status-card-達標 { --status-color: var(--good); }
+.status-card-偏高 { --status-color: var(--danger); }
+.status-card-偏低 { --status-color: var(--low); }
 .metric-topline { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
 .metric-topline h3 { margin: 0; font-size: 1rem; }
 .metric-topline div > span { display: block; margin-top: 4px; color: var(--muted); font-size: 0.74rem; }
-.status { flex: 0 0 auto; padding: 5px 9px; border-radius: 99px; font-size: 0.72rem; font-weight: 800; }
-.status-達標 { color: var(--good); background: color-mix(in srgb, var(--good) 11%, transparent); }
-.status-偏高 { color: var(--warning); background: color-mix(in srgb, var(--warning) 11%, transparent); }
-.status-偏低 { color: #77aaff; background: rgba(64, 125, 255, 0.1); }
+.status { flex: 0 0 auto; padding: 7px 11px; border: 1px solid currentColor; border-radius: 99px; font-size: 0.78rem; font-weight: 900; letter-spacing: 0.02em; }
+.status-達標 { color: var(--good); background: color-mix(in srgb, var(--good) 13%, var(--surface)); }
+.status-偏高 { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, var(--surface)); }
+.status-偏低 { color: var(--low); background: color-mix(in srgb, var(--low) 13%, var(--surface)); }
 .latest-row { display: flex; align-items: baseline; gap: 12px; margin: 12px 0 -4px; }
-.latest-row strong { font-size: 1.9rem; letter-spacing: -0.04em; }
+.latest-row strong { color: var(--status-color); font-size: 2.05rem; letter-spacing: -0.04em; }
 .latest-row span { color: var(--muted); font-size: 0.8rem; }
 .chart-wrap { width: 100%; height: 210px; }
 .chart-loading { min-height: 210px; display: grid; place-items: center; color: var(--muted); }
-.target-label { margin: 0; text-align: center; color: var(--muted); font-size: 0.76rem; }
+.target-label { display: flex; justify-content: center; align-items: baseline; gap: 8px; margin: 2px 0 0; padding: 9px 12px; border-radius: 12px; color: var(--muted); background: var(--surface-soft); font-size: 0.78rem; }
+.target-label strong { color: var(--text); font-size: 0.95rem; }
 
 .report-list { display: grid; gap: 10px; }
 .report-list details, .password-panel { border: 1px solid var(--border); border-radius: 17px; background: var(--surface); overflow: hidden; }
@@ -180,6 +220,7 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
 .markdown-body blockquote { margin-left: 0; padding-left: 16px; border-left: 3px solid var(--accent); color: var(--muted); }
 .markdown-body table { width: 100%; border-collapse: collapse; overflow-x: auto; display: block; }
 .markdown-body th, .markdown-body td { padding: 8px; border: 1px solid var(--border); }
+.markdown-body mark { padding: 0.08em 0.25em; border-radius: 0.3em; color: #3b2600; background: #ffe28a; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .password-panel { margin-top: 20px; }
 .password-panel > summary span { margin-left: 8px; color: var(--muted); font-size: 0.75rem; font-weight: 500; }
 .password-content { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; padding: 22px; border-top: 1px solid var(--border); }
@@ -193,8 +234,10 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
   .topbar { padding-inline: 14px; }
   .topbar-brand span { display: none; }
   .dashboard-content { width: min(100% - 22px, 1180px); padding-top: 24px; }
+  .clinic-logo.compact { width: 142px; }
   .welcome-block { align-items: start; flex-direction: column; padding-bottom: 28px; }
   .metric-grid { grid-template-columns: 1fr; }
+  .health-section { padding: 17px 12px; border-radius: 21px; }
   .metric-card { padding: 17px 13px; }
   .share-toolbar { grid-template-columns: 1fr; }
   .share-toolbar .expiry-pill { justify-self: start; }

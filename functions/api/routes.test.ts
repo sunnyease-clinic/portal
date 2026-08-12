@@ -11,6 +11,7 @@ const env: Env = {
   SUPABASE_ANON_KEY: "sb_publishable_example-only",
   PORTAL_SESSION_SECRET: "session-secret-at-least-32-characters-long",
   PORTAL_BFF_SECRET: "bff-secret-at-least-32-characters-long",
+  TURNSTILE_SECRET_KEY: "turnstile-test-secret",
   PORTAL_SESSION_TTL_SECONDS: "3600",
 };
 
@@ -41,6 +42,7 @@ describe("patient-facing API routes", () => {
   it("logs in through the BFF without sending a publishable key as a bearer JWT", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes("challenges.cloudflare.com/turnstile")) return Response.json({ success: true });
       if (url.endsWith("/functions/v1/portal-auth")) {
         expect(new Headers(init?.headers).get("apikey")).toBe(env.SUPABASE_ANON_KEY);
         expect(new Headers(init?.headers).has("Authorization")).toBe(false);
@@ -51,7 +53,7 @@ describe("patient-facing API routes", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { context, pending } = contextFor(login, { nationalId: "A123456789", password: "1234" });
+    const { context, pending } = contextFor(login, { nationalId: "A123456789", password: "1234", turnstileToken: "test-token" });
     const response = await login(context);
     await Promise.all(pending);
 
@@ -64,6 +66,7 @@ describe("patient-facing API routes", () => {
   it("maps the public demo alias without relaxing patient identifier validation", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes("challenges.cloudflare.com/turnstile")) return Response.json({ success: true });
       if (url.endsWith("/functions/v1/portal-auth")) {
         expect(JSON.parse(String(init?.body))).toMatchObject({ nationalId: "DEMO000001", password: "demo" });
         return Response.json({ cloudId: "d".repeat(64), displayName: "示範病友" });
@@ -73,7 +76,7 @@ describe("patient-facing API routes", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { context, pending } = contextFor(login, { nationalId: "demo", password: "demo" });
+    const { context, pending } = contextFor(login, { nationalId: "demo", password: "demo", turnstileToken: "test-token" });
     const response = await login(context);
     await Promise.all(pending);
 

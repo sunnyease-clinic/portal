@@ -1,7 +1,7 @@
 import type { Env } from "./types";
 
 export async function verifyTurnstile(env: Env, token: string | undefined, remoteIp: string): Promise<boolean> {
-  if (!env.TURNSTILE_SECRET_KEY) return true;
+  if (!env.TURNSTILE_SECRET_KEY) return false;
   if (!token) return false;
   const form = new FormData();
   form.set("secret", env.TURNSTILE_SECRET_KEY);

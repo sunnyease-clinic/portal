@@ -59,6 +59,25 @@ describe("patient-facing API routes", () => {
     expect(response.headers.get("Set-Cookie")).toContain("SameSite=Strict");
   });
 
+  it("maps the public demo alias without relaxing patient identifier validation", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/functions/v1/portal-auth")) {
+        expect(JSON.parse(String(init?.body))).toMatchObject({ nationalId: "DEMO000001", password: "demo" });
+        return Response.json({ cloudId: "d".repeat(64), displayName: "示範病友" });
+      }
+      if (url.endsWith("/rest/v1/cloud_access_logs")) return new Response(null, { status: 201 });
+      throw new Error(`unexpected_fetch:${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { context, pending } = contextFor(login, { nationalId: "demo", password: "demo" });
+    const response = await login(context);
+    await Promise.all(pending);
+
+    expect(response.status).toBe(200);
+  });
+
   it("opens an unverified share directly and caps the cookie at the share expiry", async () => {
     const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

@@ -11,7 +11,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     requireEnv(context.env.PORTAL_SESSION_SECRET, "portal_session_secret");
     const body = await readJson<LoginBody>(context.request);
-    const nationalId = String(body.nationalId || "").toUpperCase().trim();
+    const enteredId = String(body.nationalId || "").trim();
+    const nationalId = enteredId.toLowerCase() === "demo" ? "DEMO000001" : enteredId.toUpperCase();
     const password = String(body.password || "");
     if (!/^[A-Z][A-Z0-9]{9}$/.test(nationalId) || password.length < 4 || password.length > 128) {
       return apiError(400, "請確認身分證字號與密碼是否完整。");

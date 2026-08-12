@@ -177,7 +177,7 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
 .reports-section { --section-color: #0ea5e9; }
 .section-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
 .section-heading h2 { margin: 0; font-size: 1.45rem; }
-.section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 0.82rem; }
+.section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 1rem; line-height: 1.55; font-weight: 500; }
 .section-number { display: grid; place-items: center; min-width: 42px; height: 42px; padding: 0 8px; border-radius: 13px; color: #fff; background: var(--section-color); font-size: 0.82rem; font-weight: 900; box-shadow: 0 8px 20px color-mix(in srgb, var(--section-color) 25%, transparent); }
 .section-description { color: var(--muted); margin: -8px 0 18px 49px; }
 .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -204,7 +204,7 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
 .status-偏低 { color: var(--low); background: color-mix(in srgb, var(--low) 13%, var(--surface)); }
 .latest-row { display: flex; align-items: baseline; gap: 12px; margin: 12px 0 -4px; }
 .latest-row strong { color: var(--status-color); font-size: 2.05rem; letter-spacing: -0.04em; }
-.latest-row span { color: var(--muted); font-size: 0.8rem; }
+.latest-row span { color: var(--muted); font-size: 1rem; font-weight: 700; }
 .chart-wrap { width: 100%; height: 210px; }
 .chart-loading { min-height: 210px; display: grid; place-items: center; color: var(--muted); }
 .target-label { display: flex; justify-content: center; align-items: baseline; gap: 8px; margin: 2px 0 0; padding: 9px 12px; border-radius: 12px; color: var(--muted); background: var(--surface-soft); font-size: 0.78rem; }

@@ -124,7 +124,7 @@ function PublicShell({ children, dark, onTheme }: { children: ReactNode; dark: b
       </button>
       <div className="public-brand">
         <ClinicLogo />
-        <span>個人健康趨勢儀表板</span>
+        <span>向怡診所</span>
       </div>
       {children}
       <p className="public-footer">您的資料經加密連線傳輸，請勿在公用裝置儲存密碼。</p>
@@ -155,7 +155,7 @@ function LoginCard({ onSuccess }: { onSuccess: () => Promise<void> }) {
 
   return (
     <section className="auth-card" aria-labelledby="login-title">
-      <div className="auth-icon">安心查看</div>
+      <div className="auth-icon">個人健康趨勢儀表板</div>
       <h1 id="login-title">登入您的健康報告</h1>
       <p className="auth-intro">預設密碼為手機末四碼；若已設定個人密碼，請使用個人密碼登入。</p>
       <form onSubmit={submit}>

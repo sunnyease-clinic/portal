@@ -21,6 +21,7 @@ export default function TrendChart({ points, target, metric, min, max, padding }
 }) {
   const axis = niceAxis(min, max, padding);
   const [lowTarget, highTarget] = target;
+  const targetArea = targetAreaBounds(target, axis.domain);
 
   return (
     <ResponsiveContainer width="100%" height={210}>
@@ -34,9 +35,7 @@ export default function TrendChart({ points, target, metric, min, max, padding }
           allowDecimals
           tick={{ fontSize: 11, fill: "var(--muted)" }}
         />
-        {lowTarget !== null && highTarget !== null && (
-          <ReferenceArea y1={lowTarget} y2={highTarget} fill="var(--accent)" fillOpacity={0.1} />
-        )}
+        <ReferenceArea y1={targetArea[0]} y2={targetArea[1]} fill="var(--accent)" fillOpacity={0.1} />
         {lowTarget !== null && <ReferenceLine y={lowTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
         {highTarget !== null && <ReferenceLine y={highTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
         <Tooltip
@@ -55,6 +54,13 @@ export default function TrendChart({ points, target, metric, min, max, padding }
       </LineChart>
     </ResponsiveContainer>
   );
+}
+
+export function targetAreaBounds(
+  [low, high]: [number | null, number | null],
+  [axisLow, axisHigh]: [number, number],
+): [number, number] {
+  return [low ?? axisLow, high ?? axisHigh];
 }
 
 export function niceAxis(min: number, max: number, padding = 0) {

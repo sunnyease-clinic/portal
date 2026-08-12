@@ -1,5 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hashPassword, sha256Hex, verifyLegacyPassword, verifyPbkdf2, verifyTempPassword } from "./passwords.ts";
+type AttemptState = { failed_count?: number | null; window_start?: string | null };
+
+function nextFailure(attempt: AttemptState | null, now: Date, limit: number, windowMs = 15 * 60 * 1000) {
+  const previousStart = attempt?.window_start ? new Date(attempt.window_start) : now;
+  const validStart = Number.isFinite(previousStart.getTime()) ? previousStart : now;
+  const withinWindow = now.getTime() - validStart.getTime() < windowMs;
+  const failedCount = withinWindow ? Number(attempt?.failed_count || 0) + 1 : 1;
+  return {
+    failedCount,
+    windowStart: (withinWindow ? validStart : now).toISOString(),
+    lockedUntil: failedCount >= limit ? new Date(now.getTime() + windowMs).toISOString() : null,
+  };
+}
 
 type PatientAuthRow = {
   cloud_id: string;
@@ -7,6 +20,7 @@ type PatientAuthRow = {
   password_hash: string | null;
   salt: string | null;
   temp_pw_hash: string | null;
+  is_demo: boolean;
 };
 
 type AuthRequest =
@@ -68,34 +82,50 @@ Deno.serve(async (request) => {
     const cloudId = await sha256Hex(`${nationalId}_${clinicSecret}`);
     const ipHash = await sha256Hex(`${clientIp}_${rateSecret}`);
     const now = new Date();
-    const { data: attempt } = await supabase
+    const [{ data: attempt, error: attemptError }, { data: ipAttempt, error: ipAttemptError }] = await Promise.all([
+      supabase
       .from("portal_auth_attempts")
       .select("failed_count,window_start,locked_until")
       .eq("identifier_hash", cloudId)
       .eq("ip_hash", ipHash)
-      .maybeSingle();
+      .maybeSingle(),
+      supabase
+        .from("portal_ip_attempts")
+        .select("failed_count,window_start,locked_until")
+        .eq("ip_hash", ipHash)
+        .maybeSingle(),
+    ]);
+    if (attemptError || ipAttemptError) return json({ error: "rate_limit_unavailable" }, 503);
     if (attempt?.locked_until && new Date(attempt.locked_until) > now) return json({ error: "invalid_credentials" }, 429);
+    if (ipAttempt?.locked_until && new Date(ipAttempt.locked_until) > now) return json({ error: "invalid_credentials" }, 429);
 
     const { data, error } = await supabase
       .from("cloud_patients")
-      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash")
+      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash,is_demo")
       .eq("cloud_id", cloudId)
       .maybeSingle();
     const row = data as PatientAuthRow | null;
     const result = row ? await validPassword(row, password, clinicSecret) : { valid: false, legacyCustom: false };
     if (error || !row || !result.valid) {
-      const windowStart = attempt?.window_start ? new Date(attempt.window_start) : now;
-      const withinWindow = now.getTime() - windowStart.getTime() < 15 * 60 * 1000;
-      const failedCount = withinWindow ? Number(attempt?.failed_count || 0) + 1 : 1;
-      const lockedUntil = failedCount >= 5 ? new Date(now.getTime() + 15 * 60 * 1000).toISOString() : null;
-      await supabase.from("portal_auth_attempts").upsert({
+      const identifierFailure = nextFailure(attempt as AttemptState | null, now, 5);
+      const ipFailure = nextFailure(ipAttempt as AttemptState | null, now, 20);
+      await Promise.all([
+        supabase.from("portal_auth_attempts").upsert({
         identifier_hash: cloudId,
         ip_hash: ipHash,
-        failed_count: failedCount,
-        window_start: withinWindow ? windowStart.toISOString() : now.toISOString(),
-        locked_until: lockedUntil,
+        failed_count: identifierFailure.failedCount,
+        window_start: identifierFailure.windowStart,
+        locked_until: identifierFailure.lockedUntil,
         updated_at: now.toISOString(),
-      });
+        }),
+        supabase.from("portal_ip_attempts").upsert({
+          ip_hash: ipHash,
+          failed_count: ipFailure.failedCount,
+          window_start: ipFailure.windowStart,
+          locked_until: ipFailure.lockedUntil,
+          updated_at: now.toISOString(),
+        }),
+      ]);
       return json({ error: "invalid_credentials" }, 401);
     }
 
@@ -103,7 +133,7 @@ Deno.serve(async (request) => {
     if (result.legacyCustom) {
       await supabase.from("cloud_patients").update({ password_hash: await hashPassword(password), salt: null }).eq("cloud_id", cloudId);
     }
-    return json({ cloudId, displayName: row.display_name || "" });
+    return json({ cloudId, displayName: row.display_name || "", isDemo: row.is_demo });
   }
 
   if (body.action === "change-password") {
@@ -115,11 +145,12 @@ Deno.serve(async (request) => {
     }
     const { data } = await supabase
       .from("cloud_patients")
-      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash")
+      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash,is_demo")
       .eq("cloud_id", cloudId)
       .maybeSingle();
     const row = data as PatientAuthRow | null;
-    if (!row || !(await validPassword(row, currentPassword, clinicSecret)).valid) return json({ error: "invalid_credentials" }, 401);
+    if (!row || row.is_demo) return json({ error: "password_change_forbidden" }, 403);
+    if (!(await validPassword(row, currentPassword, clinicSecret)).valid) return json({ error: "invalid_credentials" }, 401);
     const { error } = await supabase
       .from("cloud_patients")
       .update({ password_hash: await hashPassword(newPassword), salt: null })

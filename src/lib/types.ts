@@ -17,6 +17,7 @@ export type ClinicalRule = {
 
 export type PatientDashboard = {
   display_name: string;
+  is_demo?: boolean;
   trend_data: TrendPoint[];
   historical_reports: HistoricalReport[];
   last_updated: string | null;

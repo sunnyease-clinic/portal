@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequestPost as login } from "./login";
+import { onRequestPost as changePassword } from "./password";
 import { onRequestPost as verifyShare } from "./share/verify";
+import { signSession } from "../_lib/session";
 import type { Env } from "../_lib/types";
 
 const env: Env = {
@@ -76,6 +78,28 @@ describe("patient-facing API routes", () => {
     await Promise.all(pending);
 
     expect(response.status).toBe(200);
+  });
+
+  it("rejects password changes for the demo account before calling portal-auth", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/rest/v1/cloud_patients?")) {
+        return Response.json([{
+          cloud_id: "d".repeat(64), display_name: "示範病友", is_demo: true,
+          trend_data: [], historical_reports: [], last_updated: null,
+        }]);
+      }
+      throw new Error(`unexpected_fetch:${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const token = await signSession({ scope: "patient", cloudId: "d".repeat(64) }, env.PORTAL_SESSION_SECRET, 3600);
+    const { context } = contextFor(changePassword, { currentPassword: "demo", newPassword: "changed" });
+    Object.assign(context, {
+      request: new Request(context.request, { headers: { ...Object.fromEntries(context.request.headers), Cookie: `portal_session=${token}` } }),
+    });
+    const response = await changePassword(context);
+    expect(response.status).toBe(403);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("opens an unverified share directly and caps the cookie at the share expiry", async () => {

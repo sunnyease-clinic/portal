@@ -1,5 +1,6 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "./lib/api";
+import { DEMO_PATIENT, DEMO_RULES } from "./lib/demo";
 import {
   getTarget,
   METRIC_GROUPS,
@@ -15,7 +16,7 @@ import type {
   ShareDashboardResponse,
 } from "./lib/types";
 
-type Mode = "loading" | "login" | "share-verify" | "dashboard" | "share-dashboard";
+type Mode = "loading" | "login" | "share-verify" | "dashboard" | "share-dashboard" | "demo";
 
 const officialLineUrl = (import.meta.env.VITE_OFFICIAL_LINE_URL as string | undefined) || "https://sunnyease.tw/line";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
@@ -23,8 +24,9 @@ const TrendChart = lazy(() => import("./components/TrendChart"));
 const ReportMarkdown = lazy(() => import("./components/ReportMarkdown"));
 
 function App() {
+  const demoMode = window.location.pathname === "/demo" || window.location.pathname.startsWith("/demo/");
   const shareId = new URLSearchParams(window.location.search).get("share");
-  const [mode, setMode] = useState<Mode>(shareId ? "share-verify" : "loading");
+  const [mode, setMode] = useState<Mode>(demoMode ? "demo" : shareId ? "share-verify" : "loading");
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [shareDashboard, setShareDashboard] = useState<ShareDashboardResponse | null>(null);
   const [selectedPatient, setSelectedPatient] = useState(0);
@@ -36,14 +38,14 @@ function App() {
   }, [dark]);
 
   useEffect(() => {
-    if (shareId) return;
+    if (shareId || demoMode) return;
     api.dashboard()
       .then((payload) => {
         setDashboard(payload);
         setMode("dashboard");
       })
       .catch(() => setMode("login"));
-  }, [shareId]);
+  }, [demoMode, shareId]);
 
   async function handleLogout() {
     await api.logout().catch(() => undefined);
@@ -53,6 +55,20 @@ function App() {
   }
 
   if (mode === "loading") return <LoadingScreen />;
+
+  if (mode === "demo") {
+    return (
+      <DashboardShell
+        dark={dark}
+        onTheme={() => setDark((value) => !value)}
+        onLogout={() => window.location.assign("/")}
+        demoMode
+      >
+        <div className="demo-banner" role="status">公開展示頁面・內容皆為合成展示資料，不含任何真實病人資訊。</div>
+        <PatientView patient={DEMO_PATIENT} rules={DEMO_RULES} demoMode />
+      </DashboardShell>
+    );
+  }
 
   if (mode === "login") {
     return (
@@ -263,12 +279,13 @@ function ShareVerifyCard({ shareId, onSuccess }: { shareId: string; onSuccess: (
   );
 }
 
-function DashboardShell({ children, dark, onTheme, onLogout, shareMode = false }: {
+function DashboardShell({ children, dark, onTheme, onLogout, shareMode = false, demoMode = false }: {
   children: ReactNode;
   dark: boolean;
   onTheme: () => void;
   onLogout: () => void;
   shareMode?: boolean;
+  demoMode?: boolean;
 }) {
   return (
     <main className="dashboard-page">
@@ -279,7 +296,7 @@ function DashboardShell({ children, dark, onTheme, onLogout, shareMode = false }
         </div>
         <div className="topbar-actions">
           <button className="theme-button" onClick={onTheme} aria-label={dark ? "切換亮色模式" : "切換深色模式"}>{dark ? "☀" : "☾"}</button>
-          <button className="secondary-button" onClick={onLogout}>{shareMode ? "結束檢視" : "登出"}</button>
+          <button className="secondary-button" onClick={onLogout}>{demoMode ? "回登入頁" : shareMode ? "結束檢視" : "登出"}</button>
         </div>
       </header>
       <div className="dashboard-content">{children}</div>
@@ -334,12 +351,17 @@ function Turnstile({ siteKey, onToken }: { siteKey: string; onToken: (token: str
   return <div className="turnstile-wrap" ref={setContainer} aria-label="安全驗證" />;
 }
 
-function PatientView({ patient, rules, shareMode = false }: { patient: PatientDashboard; rules: ClinicalRule[]; shareMode?: boolean }) {
+function PatientView({ patient, rules, shareMode = false, demoMode = false }: {
+  patient: PatientDashboard;
+  rules: ClinicalRule[];
+  shareMode?: boolean;
+  demoMode?: boolean;
+}) {
   return (
     <>
       <section className="welcome-block">
         <div>
-          <span className="eyebrow">{shareMode ? "交班安全檢視" : "個人報告"}</span>
+          <span className="eyebrow">{demoMode ? "公開展示" : shareMode ? "交班安全檢視" : "個人報告"}</span>
           <h1>{patient.display_name ? `${patient.display_name}您好` : "您好"}</h1>
           <p>一起看看最近的檢驗趨勢。數值若有疑問，請依醫師說明為準。</p>
         </div>
@@ -364,7 +386,7 @@ function PatientView({ patient, rules, shareMode = false }: { patient: PatientDa
       ))}
 
       <ReportSection reports={patient.historical_reports} />
-      {!shareMode && <PasswordPanel />}
+      {!shareMode && !demoMode && !patient.is_demo && <PasswordPanel />}
       <footer className="dashboard-footer">此儀表板供個人照護參考，治療與飲食調整請依醫師指示。</footer>
     </>
   );

@@ -1,6 +1,6 @@
 import { apiError, json, readJson } from "../_lib/http";
 import { patientSession } from "../_lib/session";
-import { callPortalAuth, logAccess } from "../_lib/supabase";
+import { callPortalAuth, getPatient, logAccess } from "../_lib/supabase";
 import type { Env } from "../_lib/types";
 
 type PasswordBody = { currentPassword?: string; newPassword?: string };
@@ -9,6 +9,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const session = await patientSession(context.request, context.env);
     if (!session) return apiError(401, "請重新登入。");
+    const patient = await getPatient(context.env, session.cloudId);
+    if (!patient) return apiError(401, "請重新登入。");
+    if (patient.is_demo) return apiError(403, "示範帳號不可變更密碼。");
     const body = await readJson<PasswordBody>(context.request);
     const currentPassword = String(body.currentPassword || "");
     const newPassword = String(body.newPassword || "");

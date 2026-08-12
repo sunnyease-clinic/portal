@@ -21,7 +21,7 @@ async function selectRows<T>(env: Env, path: string): Promise<T[]> {
 }
 
 export async function getPatient(env: Env, cloudId: string): Promise<CloudPatientRow | null> {
-  const select = "cloud_id,display_name,trend_data,historical_reports,last_updated";
+  const select = "cloud_id,display_name,is_demo,trend_data,historical_reports,last_updated";
   const rows = await selectRows<CloudPatientRow>(env, `cloud_patients?select=${select}&cloud_id=eq.${encodeURIComponent(cloudId)}&limit=1`);
   return rows[0] ?? null;
 }
@@ -75,6 +75,7 @@ export async function callPortalAuth<T>(env: Env, body: unknown, clientIp: strin
 export function publicPatient(row: CloudPatientRow) {
   return {
     display_name: row.display_name || "",
+    is_demo: row.is_demo,
     trend_data: Array.isArray(row.trend_data) ? row.trend_data : [],
     historical_reports: Array.isArray(row.historical_reports) ? row.historical_reports : [],
     last_updated: row.last_updated,

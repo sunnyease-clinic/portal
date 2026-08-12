@@ -29,6 +29,7 @@ export type PortalSession = PatientSession | ShareSession;
 export type CloudPatientRow = {
   cloud_id: string;
   display_name: string | null;
+  is_demo: boolean;
   trend_data: unknown[] | null;
   historical_reports: unknown[] | null;
   last_updated: string | null;

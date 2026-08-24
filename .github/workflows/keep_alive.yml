@@ -2,14 +2,31 @@ name: Keep Portal Alive
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Every 6 hours
-  workflow_dispatch:      # Manual trigger
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      - name: Wake up Streamlit
+      - name: Keep Supabase database active
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEEPALIVE_KEY: ${{ secrets.SUPABASE_KEEPALIVE_KEY }}
         run: |
-          curl -I -k https://sunnyease.streamlit.app/ || true
-          echo "Pinged at $(date)"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_KEEPALIVE_KEY"
+
+          auth_headers=(-H "apikey: $SUPABASE_KEEPALIVE_KEY")
+          if [[ "$SUPABASE_KEEPALIVE_KEY" == eyJ* ]]; then
+            auth_headers+=(-H "Authorization: Bearer $SUPABASE_KEEPALIVE_KEY")
+          fi
+
+          curl --fail --silent --show-error \
+            "${auth_headers[@]}" \
+            "$SUPABASE_URL/rest/v1/cloud_clinical_rules?select=rule_key&limit=1" \
+            --output /dev/null

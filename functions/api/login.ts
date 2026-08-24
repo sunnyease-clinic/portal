@@ -26,8 +26,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     let auth: LoginResult;
     try {
       auth = await callPortalAuth<LoginResult>(context.env, { action: "login", nationalId, password }, clientIp);
-    } catch {
-      return apiError(401, "登入資料不正確，請重新輸入或聯絡診所官方 LINE。");
+    } catch (reason) {
+      const code = reason instanceof Error ? reason.message : "";
+      if (code === "invalid_credentials") {
+        return apiError(401, "登入資料不正確，請重新輸入或聯絡診所官方 LINE。");
+      }
+      return apiError(503, "系統服務正在連線，請稍候一至兩分鐘再試。");
     }
 
     const ttl = sessionTtl(context.env);

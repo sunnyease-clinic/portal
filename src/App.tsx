@@ -154,6 +154,7 @@ function LoginCard({ onSuccess }: { onSuccess: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileRevision, setTurnstileRevision] = useState(0);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -164,6 +165,8 @@ function LoginCard({ onSuccess }: { onSuccess: () => Promise<void> }) {
       await onSuccess();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "登入失敗，請稍後再試。");
+      setTurnstileToken("");
+      setTurnstileRevision((revision) => revision + 1);
     } finally {
       setBusy(false);
     }
@@ -199,8 +202,8 @@ function LoginCard({ onSuccess }: { onSuccess: () => Promise<void> }) {
           />
         </label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onToken={setTurnstileToken} />}
-        <button className="primary-button" disabled={busy}>{busy ? "安全驗證中…" : "登入並查看報告"}</button>
+        {turnstileSiteKey && <Turnstile key={turnstileRevision} siteKey={turnstileSiteKey} onToken={setTurnstileToken} />}
+        <button className="primary-button" disabled={busy || (Boolean(turnstileSiteKey) && !turnstileToken)}>{busy ? "安全驗證中…" : "登入並查看報告"}</button>
       </form>
       <div className="auth-help">
         <span>忘記密碼？</span>
@@ -219,6 +222,7 @@ function ShareVerifyCard({ shareId, onSuccess }: { shareId: string; onSuccess: (
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileRevision, setTurnstileRevision] = useState(0);
   const onSuccessRef = useRef(onSuccess);
 
   useEffect(() => {
@@ -250,6 +254,8 @@ function ShareVerifyCard({ shareId, onSuccess }: { shareId: string; onSuccess: (
       await onSuccess();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "驗證失敗，請稍後再試。");
+      setTurnstileToken("");
+      setTurnstileRevision((revision) => revision + 1);
     } finally {
       setBusy(false);
     }
@@ -272,8 +278,8 @@ function ShareVerifyCard({ shareId, onSuccess }: { shareId: string; onSuccess: (
           />
         </label>
         {error && <div className="form-error" role="alert">{error}</div>}
-        {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onToken={setTurnstileToken} />}
-        <button className="primary-button" disabled={busy}>{busy ? "驗證中…" : "驗證並開啟"}</button>
+        {turnstileSiteKey && <Turnstile key={turnstileRevision} siteKey={turnstileSiteKey} onToken={setTurnstileToken} />}
+        <button className="primary-button" disabled={busy || (Boolean(turnstileSiteKey) && !turnstileToken)}>{busy ? "驗證中…" : "驗證並開啟"}</button>
       </form>
     </section>
   );

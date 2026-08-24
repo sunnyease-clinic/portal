@@ -75,4 +75,5 @@
 
 - Cloudflare 與 Supabase 都維持 Free plan，不啟用會自動產生固定月費的資源。
 - 每月查看兩邊用量；接近額度時先告警與評估，不直接升級。
-- NephroSystem 原有同步與病人正常使用會產生 Supabase 活動；不另外新增付費 keep-alive 服務。
+- `.github/workflows/keep_alive.yml` 每 6 小時對 `cloud_clinical_rules` 做一次最小讀取，避免低使用量期間自動暫停；沿用 GitHub Actions，不新增付費服務。
+- GitHub repository secrets 必須設定 `SUPABASE_URL` 與 `SUPABASE_KEEPALIVE_KEY`；後者使用可讀取資料庫的 Supabase secret/service-role key，禁止寫入 workflow 或紀錄。

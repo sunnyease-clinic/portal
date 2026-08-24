@@ -83,6 +83,23 @@ describe("patient-facing API routes", () => {
     expect(response.status).toBe(200);
   });
 
+  it("reports an unavailable Supabase service without blaming the credentials", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("challenges.cloudflare.com/turnstile")) return Response.json({ success: true });
+      if (url.endsWith("/functions/v1/portal-auth")) {
+        return Response.json({ error: "project_paused" }, { status: 540 });
+      }
+      throw new Error(`unexpected_fetch:${url}`);
+    }));
+
+    const { context } = contextFor(login, { nationalId: "A123456789", password: "1234", turnstileToken: "test-token" });
+    const response = await login(context);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "系統服務正在連線，請稍候一至兩分鐘再試。" });
+  });
+
   it("rejects password changes for the demo account before calling portal-auth", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

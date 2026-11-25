@@ -17,10 +17,12 @@ describe("clinical presentation helpers", () => {
     expect(parseRule("<55")).toEqual([null, 55]);
   });
 
-  it("groups duplicate dates and sorts them", () => {
+  it("groups duplicate dates, ignores null/blank results, and sorts them", () => {
     expect(pointsForMetric([
       { nhi_code: "K", test_result_numeric: 5, visit_date: "2026-02-02" },
       { nhi_code: "K", test_result_numeric: 3, visit_date: "2026-02-02" },
+      { nhi_code: "K", test_result_numeric: null, visit_date: "2026-02-15" },
+      { nhi_code: "K", test_result_numeric: "", visit_date: "2026-02-20" },
       { nhi_code: "K", test_result_numeric: 4, visit_date: "2026-01-01" },
       { nhi_code: "OTHER", test_result_numeric: 99, visit_date: "2026-01-01" },
     ], "K")).toEqual([

@@ -168,6 +168,13 @@ export function pointsForMetric(data: TrendPoint[], metricKey: string): ChartPoi
   const grouped = new Map<string, number[]>();
   for (const point of data) {
     if (point.nhi_code !== metricKey) continue;
+    if (
+      point.test_result_numeric === null ||
+      point.test_result_numeric === undefined ||
+      (typeof point.test_result_numeric === "string" && point.test_result_numeric.trim() === "")
+    ) {
+      continue;
+    }
     const numeric = Number(point.test_result_numeric);
     if (!Number.isFinite(numeric) || !point.visit_date) continue;
     const date = point.visit_date.slice(0, 10);
@@ -179,6 +186,19 @@ export function pointsForMetric(data: TrendPoint[], metricKey: string): ChartPoi
       date,
       value: values.reduce((sum, item) => sum + item, 0) / values.length,
     }));
+}
+
+export function cleanSourceOrg(raw?: string | null): string {
+  const text = (raw || "").trim();
+  if (!text) return "";
+  if (text.includes("Codex") || text.includes("本機醫令")) return "本院醫令";
+  return text.replace(/\d{8,}$/, "").trim();
+}
+
+export function formatDoctorLabel(raw?: string | null): string {
+  const text = (raw || "").trim();
+  if (!text) return "";
+  return text.endsWith("醫師") ? text : `${text} 醫師`;
 }
 
 export function filterPointsByMonths(points: ChartPoint[], months: 3 | 6 | 12): ChartPoint[] {

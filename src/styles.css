@@ -556,45 +556,415 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px c
   font-size: 0.76rem;
 }
 
+.print-only {
+  display: none;
+}
+
+@page {
+  size: A4 portrait;
+  margin: 10mm 12mm;
+}
+
 @media print {
-  :root, :root[data-theme="dark"], :root[data-theme="light"] {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  :root,
+  :root[data-theme="dark"],
+  :root[data-theme="light"],
+  :root[data-font="large"] {
     color-scheme: light;
+    font-size: 13px !important;
     --bg: #ffffff;
     --surface: #ffffff;
     --surface-soft: #f8fafc;
     --surface-raised: #f1f5f9;
-    --text: #111827;
-    --muted: #4b5563;
-    --border: rgba(17, 24, 39, 0.18);
+    --text: #0f172a;
+    --muted: #475569;
+    --border: #cbd5e1;
+    --accent: #0f766e;
     --shadow: none;
   }
 
-  .topbar-actions,
-  .overview-jumps,
-  .trend-toolbar,
-  .password-panel,
-  .demo-banner {
+  body,
+  .dashboard-page {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    min-height: auto;
+  }
+
+  .topbar,
+  .share-toolbar,
+  .demo-banner,
+  .screen-only {
     display: none !important;
   }
 
-  .topbar {
-    position: static;
-    padding: 8px 0;
-    background: #ffffff;
-    border-bottom: 1px solid #d1d5db;
-  }
-
   .dashboard-content {
-    width: 100%;
-    padding: 12px 0;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  .health-section,
-  .metric-card,
-  .care-card,
-  .med-row,
-  .overview-summary {
-    box-shadow: none !important;
+  .print-only {
+    display: block !important;
+  }
+
+  .print-sheet {
+    font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    color: #0f172a;
+    line-height: 1.48;
+  }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #0f766e;
+  }
+
+  .print-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .print-logo-box {
+    display: block;
+    width: 38px;
+    height: 38px;
+    overflow: hidden;
+    border-radius: 9px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
+  }
+
+  .print-logo {
+    display: block;
+    width: auto;
+    max-width: none;
+    height: 100%;
+    margin-left: -5.5%;
+  }
+
+  .print-clinic-name {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0f766e;
+    letter-spacing: 0.06em;
+  }
+
+  .print-header h1 {
+    margin: 1px 0 0;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .print-meta {
+    text-align: right;
+    display: grid;
+    gap: 3px;
+    justify-items: end;
+  }
+
+  .print-patient-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .print-meta-line {
+    font-size: 10px;
+    color: #475569;
+  }
+
+  .print-meta-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .print-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .print-pill-good {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+  }
+
+  .print-pill-warn {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
+
+  .print-block {
+    margin-bottom: 10px;
+  }
+
+  .print-section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #cbd5e1;
+    break-after: avoid;
+  }
+
+  .print-section-title h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f766e;
+  }
+
+  .print-section-title span {
+    font-size: 9.5px;
+    color: #64748b;
+  }
+
+  .print-lab-table,
+  .print-compact-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+  }
+
+  .print-lab-table th,
+  .print-compact-table th {
+    text-align: left;
+    padding: 4px 6px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #475569;
+    background: #f1f5f9;
+    border-top: 1px solid #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
+  }
+
+  .print-lab-table td,
+  .print-compact-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+
+  .print-lab-table .num {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .print-lab-table .spark-col {
+    width: 142px;
+    text-align: right;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .print-sparkline {
+    display: block;
+    margin-left: auto;
+  }
+
+  .print-group-row td {
+    padding: 4px 6px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #0f766e;
+    background: #f0fdfa;
+    border-bottom: 1px solid #99f6e4;
+  }
+
+  .print-row-status-偏高 td {
+    background: #fff5f5;
+  }
+
+  .print-row-status-偏低 td {
+    background: #eff6ff;
+  }
+
+  .print-lab-table .strong,
+  .print-compact-table .strong {
+    font-weight: 700;
+  }
+
+  .print-lab-table .mono,
+  .print-compact-table .mono {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .print-lab-table .muted {
+    color: #64748b;
+    font-size: 9.5px;
+  }
+
+  .print-unit {
+    font-size: 9px;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  .print-val-達標 { color: #0f766e; }
+  .print-val-偏高 { color: #dc2626; }
+  .print-val-偏低 { color: #1d4ed8; }
+
+  .print-status-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-size: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .print-status-tag.tag-達標 {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .print-status-tag.tag-偏高 {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .print-status-tag.tag-偏低 {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .print-report-block {
+    break-inside: auto;
+  }
+
+  .print-report-body {
+    padding: 8px 12px;
+    border-left: 3px solid #0f766e;
+    background: #f8faf9;
+    border-radius: 0 6px 6px 0;
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+
+  .print-report-body h1,
+  .print-report-body h2,
+  .print-report-body h3 {
+    margin: 7px 0 3px;
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #0f172a;
+    break-after: avoid;
+  }
+
+  .print-report-body h1:first-child,
+  .print-report-body h2:first-child,
+  .print-report-body h3:first-child,
+  .print-report-body p:first-child {
+    margin-top: 0;
+  }
+
+  .print-report-body p {
+    margin: 3px 0;
+  }
+
+  .print-report-body ul,
+  .print-report-body ol {
+    margin: 3px 0 6px;
+    padding-left: 18px;
+  }
+
+  .print-report-body li {
+    margin: 2px 0;
     break-inside: avoid;
+  }
+
+  .print-med-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 10px;
+  }
+
+  .print-med-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 5px 7px;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    background: #ffffff;
+    font-size: 9.5px;
+    break-inside: avoid;
+  }
+
+  .print-med-main {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .print-med-main strong {
+    font-size: 9.8px;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .print-med-generic {
+    font-size: 8.5px;
+    color: #64748b;
+    word-break: break-word;
+  }
+
+  .print-med-side {
+    display: grid;
+    gap: 2px;
+    justify-items: end;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .print-freq {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
+    color: #0f766e;
+    font-size: 8.8px;
+    font-weight: 700;
+  }
+
+  .print-med-meta {
+    font-size: 8.2px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  .print-footer {
+    margin-top: 8px;
+    padding-top: 5px;
+    border-top: 1px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 8.8px;
+    color: #64748b;
+    break-before: avoid;
   }
 }

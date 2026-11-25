@@ -2,7 +2,9 @@ import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type R
 import { api } from "./lib/api";
 import { DEMO_PATIENT, DEMO_RULES } from "./lib/demo";
 import {
+  cleanSourceOrg,
   filterPointsByMonths,
+  formatDoctorLabel,
   formatShortDate,
   getMetricDescription,
   getTarget,
@@ -12,6 +14,7 @@ import {
   trendLabel,
   type Metric,
 } from "./lib/clinical";
+import PrintSummary from "./components/PrintSummary";
 import type {
   ActiveMedication,
   ClinicalRule,
@@ -462,6 +465,7 @@ function PatientView({ patient, rules, shareMode = false, demoMode = false }: {
 
   return (
     <>
+      <div className="screen-only">
       <section className="welcome-block">
         <div>
           <span className="eyebrow">{demoMode ? "公開展示" : shareMode ? "交班安全檢視" : "個人報告"}</span>
@@ -582,6 +586,13 @@ function PatientView({ patient, rules, shareMode = false, demoMode = false }: {
       <ReportSection reports={olderReports} hasFeaturedReport={Boolean(latestReport)} />
       {!shareMode && !demoMode && !patient.is_demo && <PasswordPanel />}
       <footer className="dashboard-footer">此儀表板供個人照護參考，治療與飲食調整請依醫師指示。</footer>
+      </div>
+      <PrintSummary
+        patient={patient}
+        rules={rules}
+        windowMonths={windowMonths}
+        updatedLabel={patient.last_updated ? formatDateTime(patient.last_updated) : ""}
+      />
     </>
   );
 }
@@ -659,7 +670,7 @@ function AppointmentsSection({ appointments }: { appointments: UpcomingAppointme
             </div>
             <h3>{appt.hospital_name}</h3>
             <p className="care-meta">
-              {[appt.dept_name, appt.doctor_name ? `${appt.doctor_name} 醫師` : ""].filter(Boolean).join(" · ") || "一般門診"}
+              {[appt.dept_name, formatDoctorLabel(appt.doctor_name)].filter(Boolean).join(" · ") || "一般門診"}
             </p>
             {(appt.time_slot || appt.room) && (
               <p className="care-submeta">{[appt.time_slot, appt.room].filter(Boolean).join(" / ")}</p>
@@ -695,7 +706,7 @@ function MedicationsSection({ medications }: { medications: ActiveMedication[] }
             <div className="med-detail-block">
               {med.frequency && <span className="care-badge">{med.frequency}</span>}
               <small>
-                {[med.prescribed_date, med.source_org].filter(Boolean).join(" · ")}
+                {[med.prescribed_date, cleanSourceOrg(med.source_org)].filter(Boolean).join(" · ")}
               </small>
             </div>
           </div>

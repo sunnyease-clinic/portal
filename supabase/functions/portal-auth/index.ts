@@ -21,6 +21,7 @@ type PatientAuthRow = {
   salt: string | null;
   temp_pw_hash: string | null;
   is_demo: boolean;
+  is_active: boolean;
 };
 
 type AuthRequest =
@@ -101,8 +102,9 @@ Deno.serve(async (request) => {
 
     const { data, error } = await supabase
       .from("cloud_patients")
-      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash,is_demo")
+      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash,is_demo,is_active")
       .eq("cloud_id", cloudId)
+      .eq("is_active", true)
       .maybeSingle();
     const row = data as PatientAuthRow | null;
     const result = row ? await validPassword(row, password, clinicSecret) : { valid: false, legacyCustom: false };
@@ -145,8 +147,9 @@ Deno.serve(async (request) => {
     }
     const { data } = await supabase
       .from("cloud_patients")
-      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash,is_demo")
+      .select("cloud_id,display_name,password_hash,salt,temp_pw_hash,is_demo,is_active")
       .eq("cloud_id", cloudId)
+      .eq("is_active", true)
       .maybeSingle();
     const row = data as PatientAuthRow | null;
     if (!row || row.is_demo) return json({ error: "password_change_forbidden" }, 403);

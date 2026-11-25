@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { onRequestGet as dashboard } from "./dashboard";
 import { onRequestPost as login } from "./login";
 import { onRequestPost as changePassword } from "./password";
 import { onRequestPost as verifyShare } from "./share/verify";
@@ -104,8 +105,9 @@ describe("patient-facing API routes", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/rest/v1/cloud_patients?")) {
+        expect(url).toContain("is_active=eq.true");
         return Response.json([{
-          cloud_id: "d".repeat(64), display_name: "示範病友", is_demo: true,
+          cloud_id: "d".repeat(64), display_name: "示範病友", is_demo: true, is_active: true,
           trend_data: [], historical_reports: [], last_updated: null,
         }]);
       }
@@ -190,5 +192,59 @@ describe("patient-facing API routes", () => {
     const response = await verifyShare(context);
     expect(response.status).toBe(404);
     expect(response.headers.has("Set-Cookie")).toBe(false);
+  });
+
+  it("falls back to base patient columns on HTTP 400 and still passes active filter + rules description", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/rest/v1/cloud_patients?") && url.includes("upcoming_appointments")) {
+        expect(url).toContain("is_active=eq.true");
+        return new Response("column does not exist", { status: 400 });
+      }
+      if (url.includes("/rest/v1/cloud_patients?")) {
+        expect(url).toContain("is_active=eq.true");
+        return Response.json([{
+          cloud_id: "a".repeat(64),
+          display_name: "測試病友",
+          is_demo: false,
+          is_active: true,
+          trend_data: [],
+          historical_reports: [{ report_month: "2026-11", final_output: "報告內容" }],
+          last_updated: "2026-11-25T12:00:00+08:00",
+        }]);
+      }
+      if (url.includes("/rest/v1/cloud_clinical_rules?")) {
+        expect(url).toContain("description");
+        return Response.json([
+          { rule_key: "ferritin_target", rule_value: "200-800", unit: "ng/mL", description: "體內的鐵質倉庫" },
+        ]);
+      }
+      throw new Error(`unexpected_fetch:${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const token = await signSession({ scope: "patient", cloudId: "a".repeat(64) }, env.PORTAL_SESSION_SECRET, 3600);
+    const context = {
+      request: new Request("https://portal.example/api/dashboard", {
+        method: "GET",
+        headers: { Cookie: `portal_session=${token}` },
+      }),
+      env,
+      params: {},
+      data: {},
+      functionPath: "",
+      next: () => Promise.resolve(new Response()),
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+    } as unknown as Parameters<typeof dashboard>[0];
+
+    const response = await dashboard(context);
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      patient: { upcoming_appointments: unknown[]; active_medications: unknown[] };
+      rules: Array<{ description?: string | null }>;
+    };
+    expect(body.patient.upcoming_appointments).toEqual([]);
+    expect(body.patient.active_medications).toEqual([]);
+    expect(body.rules[0].description).toBe("體內的鐵質倉庫");
   });
 });

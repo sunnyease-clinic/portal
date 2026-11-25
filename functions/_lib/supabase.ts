@@ -20,10 +20,29 @@ async function selectRows<T>(env: Env, path: string): Promise<T[]> {
   return (await response.json()) as T[];
 }
 
+const BASE_PATIENT_SELECT =
+  "cloud_id,display_name,is_demo,is_active,trend_data,historical_reports,last_updated";
+const FULL_PATIENT_SELECT =
+  `${BASE_PATIENT_SELECT},upcoming_appointments,active_medications`;
+
 export async function getPatient(env: Env, cloudId: string): Promise<CloudPatientRow | null> {
-  const select = "cloud_id,display_name,is_demo,trend_data,historical_reports,last_updated";
-  const rows = await selectRows<CloudPatientRow>(env, `cloud_patients?select=${select}&cloud_id=eq.${encodeURIComponent(cloudId)}&limit=1`);
-  return rows[0] ?? null;
+  const filter = `cloud_id=eq.${encodeURIComponent(cloudId)}&is_active=eq.true&limit=1`;
+  try {
+    const rows = await selectRows<CloudPatientRow>(
+      env,
+      `cloud_patients?select=${FULL_PATIENT_SELECT}&${filter}`,
+    );
+    return rows[0] ?? null;
+  } catch (error) {
+    if (error instanceof Error && error.message === "supabase_select_400") {
+      const rows = await selectRows<CloudPatientRow>(
+        env,
+        `cloud_patients?select=${BASE_PATIENT_SELECT}&${filter}`,
+      );
+      return rows[0] ?? null;
+    }
+    throw error;
+  }
 }
 
 export async function getPatients(env: Env, cloudIds: string[]): Promise<CloudPatientRow[]> {
@@ -32,9 +51,9 @@ export async function getPatients(env: Env, cloudIds: string[]): Promise<CloudPa
 }
 
 export async function getClinicalRules(env: Env) {
-  return selectRows<{ rule_key: string; rule_value: string; unit: string | null }>(
+  return selectRows<{ rule_key: string; rule_value: string; unit: string | null; description?: string | null }>(
     env,
-    "cloud_clinical_rules?select=rule_key,rule_value,unit&order=rule_key.asc",
+    "cloud_clinical_rules?select=rule_key,rule_value,unit,description&order=rule_key.asc",
   );
 }
 
@@ -78,6 +97,8 @@ export function publicPatient(row: CloudPatientRow) {
     is_demo: row.is_demo,
     trend_data: Array.isArray(row.trend_data) ? row.trend_data : [],
     historical_reports: Array.isArray(row.historical_reports) ? row.historical_reports : [],
+    upcoming_appointments: Array.isArray(row.upcoming_appointments) ? row.upcoming_appointments : [],
+    active_medications: Array.isArray(row.active_medications) ? row.active_medications : [],
     last_updated: row.last_updated,
   };
 }

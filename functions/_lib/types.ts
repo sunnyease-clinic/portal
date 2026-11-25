@@ -30,8 +30,11 @@ export type CloudPatientRow = {
   cloud_id: string;
   display_name: string | null;
   is_demo: boolean;
+  is_active: boolean;
   trend_data: unknown[] | null;
   historical_reports: unknown[] | null;
+  upcoming_appointments?: unknown[] | null;
+  active_medications?: unknown[] | null;
   last_updated: string | null;
 };
 

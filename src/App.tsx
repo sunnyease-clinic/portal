@@ -2,6 +2,9 @@ import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState, type R
 import { api } from "./lib/api";
 import { DEMO_PATIENT, DEMO_RULES } from "./lib/demo";
 import {
+  filterPointsByMonths,
+  formatShortDate,
+  getMetricDescription,
   getTarget,
   METRIC_GROUPS,
   pointsForMetric,
@@ -10,13 +13,16 @@ import {
   type Metric,
 } from "./lib/clinical";
 import type {
+  ActiveMedication,
   ClinicalRule,
   DashboardResponse,
   PatientDashboard,
   ShareDashboardResponse,
+  UpcomingAppointment,
 } from "./lib/types";
 
 type Mode = "loading" | "login" | "share-verify" | "dashboard" | "share-dashboard" | "demo";
+type TimeWindowMonths = 3 | 6 | 12;
 
 const officialLineUrl = (import.meta.env.VITE_OFFICIAL_LINE_URL as string | undefined) || "https://sunnyease.tw/line";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
@@ -31,11 +37,17 @@ function App() {
   const [shareDashboard, setShareDashboard] = useState<ShareDashboardResponse | null>(null);
   const [selectedPatient, setSelectedPatient] = useState(0);
   const [dark, setDark] = useState(() => localStorage.getItem("portal-theme") !== "light");
+  const [largeFont, setLargeFont] = useState(() => localStorage.getItem("portal-font-scale") === "large");
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("portal-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  useEffect(() => {
+    document.documentElement.dataset.font = largeFont ? "large" : "normal";
+    localStorage.setItem("portal-font-scale", largeFont ? "large" : "normal");
+  }, [largeFont]);
 
   useEffect(() => {
     if (shareId || demoMode) return;
@@ -60,7 +72,9 @@ function App() {
     return (
       <DashboardShell
         dark={dark}
+        largeFont={largeFont}
         onTheme={() => setDark((value) => !value)}
+        onFontToggle={() => setLargeFont((value) => !value)}
         onLogout={() => window.location.assign("/")}
         demoMode
       >
@@ -102,7 +116,14 @@ function App() {
   if (mode === "share-dashboard" && shareDashboard) {
     const patient = shareDashboard.patients[selectedPatient];
     return (
-      <DashboardShell dark={dark} onTheme={() => setDark((value) => !value)} onLogout={handleLogout} shareMode>
+      <DashboardShell
+        dark={dark}
+        largeFont={largeFont}
+        onTheme={() => setDark((value) => !value)}
+        onFontToggle={() => setLargeFont((value) => !value)}
+        onLogout={handleLogout}
+        shareMode
+      >
         <div className="share-toolbar">
           <label htmlFor="patient-select">交班病患</label>
           <select
@@ -123,7 +144,13 @@ function App() {
 
   if (dashboard) {
     return (
-      <DashboardShell dark={dark} onTheme={() => setDark((value) => !value)} onLogout={handleLogout}>
+      <DashboardShell
+        dark={dark}
+        largeFont={largeFont}
+        onTheme={() => setDark((value) => !value)}
+        onFontToggle={() => setLargeFont((value) => !value)}
+        onLogout={handleLogout}
+      >
         <PatientView patient={dashboard.patient} rules={dashboard.rules} />
       </DashboardShell>
     );
@@ -285,10 +312,21 @@ function ShareVerifyCard({ shareId, onSuccess }: { shareId: string; onSuccess: (
   );
 }
 
-function DashboardShell({ children, dark, onTheme, onLogout, shareMode = false, demoMode = false }: {
+function DashboardShell({
+  children,
+  dark,
+  largeFont,
+  onTheme,
+  onFontToggle,
+  onLogout,
+  shareMode = false,
+  demoMode = false,
+}: {
   children: ReactNode;
   dark: boolean;
+  largeFont: boolean;
   onTheme: () => void;
+  onFontToggle: () => void;
   onLogout: () => void;
   shareMode?: boolean;
   demoMode?: boolean;
@@ -301,6 +339,21 @@ function DashboardShell({ children, dark, onTheme, onLogout, shareMode = false, 
           <span>個人健康趨勢儀表板</span>
         </div>
         <div className="topbar-actions">
+          <button
+            className={`secondary-button font-toggle${largeFont ? " active" : ""}`}
+            onClick={onFontToggle}
+            aria-pressed={largeFont}
+            title="切換標準或大字體"
+          >
+            {largeFont ? "標準字" : "A+ 大字"}
+          </button>
+          <button
+            className="secondary-button print-button"
+            onClick={() => window.print()}
+            title="列印或存成 PDF 帶去外院看診"
+          >
+            列印摘要
+          </button>
           <button className="theme-button" onClick={onTheme} aria-label={dark ? "切換亮色模式" : "切換深色模式"}>{dark ? "☀" : "☾"}</button>
           <button className="secondary-button" onClick={onLogout}>{demoMode ? "回登入頁" : shareMode ? "結束檢視" : "登出"}</button>
         </div>
@@ -363,16 +416,143 @@ function PatientView({ patient, rules, shareMode = false, demoMode = false }: {
   shareMode?: boolean;
   demoMode?: boolean;
 }) {
+  const [windowMonths, setWindowMonths] = useState<TimeWindowMonths>(12);
+  const reports = patient.historical_reports ?? [];
+  const latestReport = reports[0] ?? null;
+  const olderReports = reports.slice(1);
+  const appointments = patient.upcoming_appointments ?? [];
+  const medications = patient.active_medications ?? [];
+
+  const summary = useMemo(() => {
+    let withinCount = 0;
+    const attention: Array<{
+      key: string;
+      label: string;
+      status: "偏高" | "偏低";
+      value: number;
+      unit: string;
+      date: string;
+    }> = [];
+    for (const group of METRIC_GROUPS) {
+      for (const metric of group.metrics) {
+        const pts = pointsForMetric(patient.trend_data, metric.key);
+        if (!pts.length) continue;
+        const latest = pts.at(-1)!;
+        const status = statusFor(latest.value, getTarget(metric, rules));
+        if (status === "達標") {
+          withinCount += 1;
+        } else {
+          attention.push({
+            key: metric.key,
+            label: metric.label.split(" ")[0],
+            status,
+            value: latest.value,
+            unit: metric.unit,
+            date: latest.date,
+          });
+        }
+      }
+    }
+    return {
+      totalCount: withinCount + attention.length,
+      withinCount,
+      attention,
+    };
+  }, [patient.trend_data, rules]);
+
   return (
     <>
       <section className="welcome-block">
         <div>
           <span className="eyebrow">{demoMode ? "公開展示" : shareMode ? "交班安全檢視" : "個人報告"}</span>
           <h1>{patient.display_name ? `${patient.display_name}您好` : "您好"}</h1>
-          <p>一起看看最近的檢驗趨勢。數值若有疑問，請依醫師說明為準。</p>
+          <p>為您整理最近的檢驗趨勢、衛教重點與就醫參考資訊；數值或用藥調整請依醫師指示為準。</p>
         </div>
         {patient.last_updated && <span className="update-pill">資料更新 {formatDateTime(patient.last_updated)}</span>}
       </section>
+
+      {summary.totalCount > 0 && (
+        <section className="overview-summary" aria-label="本次檢驗重點總覽">
+          <div className="overview-headline">
+            <div className="overview-counts">
+              <span className="summary-pill summary-good">✓ 達標 {summary.withinCount} 項</span>
+              {summary.attention.length > 0 ? (
+                <span className="summary-pill summary-attention">需留意 {summary.attention.length} 項</span>
+              ) : (
+                <span className="summary-pill summary-good">目前項目均在建議範圍內</span>
+              )}
+            </div>
+            <div className="overview-jumps">
+              {latestReport && <a href="#latest-report" className="jump-link">最新衛教報告</a>}
+              {appointments.length > 0 && (
+                <a href="#appointments-section" className="jump-link">外院預約 ({appointments.length})</a>
+              )}
+              {medications.length > 0 && (
+                <a href="#medications-section" className="jump-link">目前用藥 ({medications.length})</a>
+              )}
+              {officialLineUrl && (
+                <a href={officialLineUrl} target="_blank" rel="noreferrer" className="jump-link line-link">
+                  聯絡診所 LINE
+                </a>
+              )}
+            </div>
+          </div>
+
+          {summary.attention.length > 0 && (
+            <div className="attention-chips">
+              <span className="attention-caption">點選項目可直接跳至圖表：</span>
+              {summary.attention.map((item) => (
+                <a key={item.key} href={`#metric-${item.key}`} className={`attention-chip chip-${item.status}`}>
+                  <strong>{item.label}</strong>
+                  <span>
+                    {item.value.toFixed(1)} {item.unit}（{item.status === "偏高" ? "↑ 偏高" : "↓ 偏低"}）
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {latestReport && (
+        <section id="latest-report" className="health-section featured-report-section" aria-label="最新一期衛教報告">
+          <div className="section-heading">
+            <span className="section-number">新</span>
+            <div>
+              <h2>最新醫師衛教說明（{latestReport.report_month}）</h2>
+              <p>醫療團隊依近期檢驗為您整理的生活與飲食照護重點</p>
+            </div>
+          </div>
+          <div className="featured-report-card">
+            <div className="markdown-body">
+              <Suspense fallback={<p>報告載入中…</p>}>
+                <ReportMarkdown content={latestReport.final_output || "本月無報告內容"} />
+              </Suspense>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="trend-toolbar">
+        <span className="trend-toolbar-label">檢驗趨勢時間範圍</span>
+        <div className="time-window-group" role="group" aria-label="檢驗趨勢時間範圍">
+          {([
+            { value: 3, label: "近 3 個月" },
+            { value: 6, label: "近 6 個月" },
+            { value: 12, label: "近 1 年" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`window-button${windowMonths === opt.value ? " active" : ""}`}
+              aria-pressed={windowMonths === opt.value}
+              onClick={() => setWindowMonths(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {METRIC_GROUPS.map((group, index) => (
         <section className={`health-section section-${group.id}`} key={group.id}>
@@ -385,25 +565,46 @@ function PatientView({ patient, rules, shareMode = false, demoMode = false }: {
           </div>
           <div className="metric-grid">
             {group.metrics.map((metric) => (
-              <MetricCard key={metric.key} metric={metric} patient={patient} rules={rules} />
+              <MetricCard
+                key={metric.key}
+                metric={metric}
+                patient={patient}
+                rules={rules}
+                windowMonths={windowMonths}
+              />
             ))}
           </div>
         </section>
       ))}
 
-      <ReportSection reports={patient.historical_reports} />
+      <AppointmentsSection appointments={appointments} />
+      <MedicationsSection medications={medications} />
+      <ReportSection reports={olderReports} hasFeaturedReport={Boolean(latestReport)} />
       {!shareMode && !demoMode && !patient.is_demo && <PasswordPanel />}
       <footer className="dashboard-footer">此儀表板供個人照護參考，治療與飲食調整請依醫師指示。</footer>
     </>
   );
 }
 
-function MetricCard({ metric, patient, rules }: { metric: Metric; patient: PatientDashboard; rules: ClinicalRule[] }) {
-  const points = useMemo(() => pointsForMetric(patient.trend_data, metric.key), [patient.trend_data, metric.key]);
+function MetricCard({
+  metric,
+  patient,
+  rules,
+  windowMonths,
+}: {
+  metric: Metric;
+  patient: PatientDashboard;
+  rules: ClinicalRule[];
+  windowMonths: TimeWindowMonths;
+}) {
+  const allPoints = useMemo(() => pointsForMetric(patient.trend_data, metric.key), [patient.trend_data, metric.key]);
+  const points = useMemo(() => filterPointsByMonths(allPoints, windowMonths), [allPoints, windowMonths]);
   const target = getTarget(metric, rules);
   if (!points.length) return null;
-  const latest = points.at(-1)!.value;
+  const latestPoint = points.at(-1)!;
+  const latest = latestPoint.value;
   const status = statusFor(latest, target);
+  const description = getMetricDescription(metric, rules);
   const values = points.map((point) => point.value);
   const finiteTarget = target.filter((value): value is number => value !== null);
   const min = Math.min(...values, ...finiteTarget);
@@ -412,15 +613,21 @@ function MetricCard({ metric, patient, rules }: { metric: Metric; patient: Patie
 
   return (
     <article
+      id={`metric-${metric.key}`}
       className={`metric-card status-card-${status}`}
     >
       <div className="metric-topline">
-        <div><h3>{metric.label}</h3><span>{metric.unit}</span></div>
+        <div>
+          <h3>{metric.label}</h3>
+          <span className="metric-unit">{metric.unit}</span>
+          <p className="metric-desc">{description}</p>
+        </div>
         <span className={`status status-${status}`}>{status === "達標" ? "✓ 達標" : status === "偏高" ? "↑ 偏高" : "↓ 偏低"}</span>
       </div>
       <div className="latest-row">
         <strong>{latest.toFixed(1)}</strong>
-        <span>{trendLabel(points)}</span>
+        <span className="latest-delta">{trendLabel(points)}</span>
+        <span className="latest-date-badge">{formatShortDate(latestPoint.date)} 抽血</span>
       </div>
       <div className="chart-wrap" aria-label={`${metric.label}趨勢圖`}>
         <Suspense fallback={<div className="chart-loading">趨勢圖載入中…</div>}>
@@ -432,12 +639,89 @@ function MetricCard({ metric, patient, rules }: { metric: Metric; patient: Patie
   );
 }
 
-function ReportSection({ reports }: { reports: PatientDashboard["historical_reports"] }) {
+function AppointmentsSection({ appointments }: { appointments: UpcomingAppointment[] }) {
+  if (!appointments.length) return null;
+  return (
+    <section id="appointments-section" className="health-section appointments-section" aria-label="未來外院門診預約">
+      <div className="section-heading">
+        <span className="section-number">診</span>
+        <div>
+          <h2>近期外院門診預約</h2>
+          <p>整理您接下來 90 天內的外院預約資訊，方便家人陪診確認</p>
+        </div>
+      </div>
+      <div className="care-grid">
+        {appointments.map((appt, index) => (
+          <article className="care-card" key={`${appt.appt_date}-${appt.hospital_name}-${index}`}>
+            <div className="care-card-top">
+              <strong>{appt.appt_date}</strong>
+              {appt.appt_seq && <span className="care-badge">{appt.appt_seq} 號</span>}
+            </div>
+            <h3>{appt.hospital_name}</h3>
+            <p className="care-meta">
+              {[appt.dept_name, appt.doctor_name ? `${appt.doctor_name} 醫師` : ""].filter(Boolean).join(" · ") || "一般門診"}
+            </p>
+            {(appt.time_slot || appt.room) && (
+              <p className="care-submeta">{[appt.time_slot, appt.room].filter(Boolean).join(" / ")}</p>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MedicationsSection({ medications }: { medications: ActiveMedication[] }) {
+  if (!medications.length) return null;
+  return (
+    <section id="medications-section" className="health-section medications-section" aria-label="目前常規用藥清單">
+      <div className="section-heading">
+        <span className="section-number">藥</span>
+        <div>
+          <h2>目前常規用藥參考清單</h2>
+          <p>外院看診或急診時，可直接出示本清單供醫師了解您的常用藥物</p>
+        </div>
+      </div>
+      <p className="med-disclaimer">僅供跨院就醫參考，實際服藥劑量與停續藥請依醫師最新指示為準。</p>
+      <div className="med-list">
+        {medications.map((med, index) => (
+          <div className="med-row" key={`${med.drug_name}-${med.brand_name || ""}-${index}`}>
+            <div className="med-name-block">
+              <strong>{med.brand_name || med.drug_name}</strong>
+              {med.brand_name && med.drug_name && med.brand_name !== med.drug_name && (
+                <span>{med.drug_name}</span>
+              )}
+            </div>
+            <div className="med-detail-block">
+              {med.frequency && <span className="care-badge">{med.frequency}</span>}
+              <small>
+                {[med.prescribed_date, med.source_org].filter(Boolean).join(" · ")}
+              </small>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReportSection({
+  reports,
+  hasFeaturedReport,
+}: {
+  reports: PatientDashboard["historical_reports"];
+  hasFeaturedReport: boolean;
+}) {
   if (!reports?.length) return null;
   return (
     <section className="health-section reports-section">
-      <div className="section-heading"><span className="section-number">報</span><h2>歷史衛教報告</h2></div>
-      <p className="section-description">展開月份即可查看過往的追蹤說明。</p>
+      <div className="section-heading">
+        <span className="section-number">報</span>
+        <div>
+          <h2>{hasFeaturedReport ? "過往歷史衛教報告" : "歷史衛教報告"}</h2>
+          <p>展開月份即可回顧過往的追蹤說明</p>
+        </div>
+      </div>
       <div className="report-list">
         {reports.map((report) => (
           <details key={report.report_month}>

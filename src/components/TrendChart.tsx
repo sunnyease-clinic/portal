@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -19,40 +20,62 @@ export default function TrendChart({ points, target, metric, min, max, padding }
   max: number;
   padding: number;
 }) {
+  const [selectedPoint, setSelectedPoint] = useState<ChartPoint | null>(null);
   const axis = niceAxis(min, max, padding);
   const [lowTarget, highTarget] = target;
   const targetArea = targetAreaBounds(target, axis.domain);
 
   return (
-    <ResponsiveContainer width="100%" height={210}>
-      <LineChart data={points} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-        <XAxis dataKey="date" tickFormatter={(value) => String(value).slice(5).replace("-", "/")} tick={{ fontSize: 11, fill: "var(--muted)" }} />
-        <YAxis
-          domain={axis.domain}
-          ticks={axis.ticks}
-          tickFormatter={formatAxisTick}
-          allowDecimals
-          tick={{ fontSize: 11, fill: "var(--muted)" }}
-        />
-        <ReferenceArea y1={targetArea[0]} y2={targetArea[1]} fill="var(--accent)" fillOpacity={0.1} />
-        {lowTarget !== null && <ReferenceLine y={lowTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
-        {highTarget !== null && <ReferenceLine y={highTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
-        <Tooltip
-          labelFormatter={(label) => `日期 ${label}`}
-          formatter={(value) => [`${Number(value).toFixed(1)} ${metric.unit}`, metric.label]}
-          contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}
-        />
-        <Line
-          type="monotone"
-          dataKey="value"
-          stroke="var(--accent)"
-          strokeWidth={3}
-          dot={{ r: 4, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }}
-          activeDot={{ r: 6, fill: "var(--accent)" }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="trend-chart-inner">
+      <ResponsiveContainer width="100%" height={198}>
+        <LineChart
+          data={points}
+          margin={{ top: 12, right: 10, left: -18, bottom: 0 }}
+          onClick={(state) => {
+            const payload = (state as { activePayload?: Array<{ payload?: ChartPoint }> } | null)?.activePayload;
+            const clicked = payload?.[0]?.payload;
+            if (clicked) {
+              setSelectedPoint((prev) => (prev?.date === clicked.date ? null : clicked));
+            }
+          }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+          <XAxis dataKey="date" tickFormatter={(value) => String(value).slice(5).replace("-", "/")} tick={{ fontSize: 11, fill: "var(--muted)" }} />
+          <YAxis
+            domain={axis.domain}
+            ticks={axis.ticks}
+            tickFormatter={formatAxisTick}
+            allowDecimals
+            tick={{ fontSize: 11, fill: "var(--muted)" }}
+          />
+          <ReferenceArea y1={targetArea[0]} y2={targetArea[1]} fill="var(--accent)" fillOpacity={0.1} />
+          {lowTarget !== null && <ReferenceLine y={lowTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
+          {highTarget !== null && <ReferenceLine y={highTarget} stroke="var(--accent)" strokeDasharray="5 4" strokeOpacity={0.75} />}
+          <Tooltip
+            labelFormatter={(label) => `日期 ${label}`}
+            formatter={(value) => [`${Number(value).toFixed(1)} ${metric.unit}`, metric.label]}
+            contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke="var(--accent)"
+            strokeWidth={3}
+            dot={{ r: 4, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }}
+            activeDot={{ r: 7, fill: "var(--accent)" }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      {selectedPoint && (
+        <div className="chart-selected-point" role="status">
+          <span>{selectedPoint.date}</span>
+          <strong>
+            {selectedPoint.value.toFixed(1)}
+            {metric.unit ? ` ${metric.unit}` : ""}
+          </strong>
+        </div>
+      )}
+    </div>
   );
 }
 

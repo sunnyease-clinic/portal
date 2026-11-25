@@ -11,7 +11,10 @@ create table if not exists public.cloud_patients (
   password_hash text,
   salt text,
   temp_pw_hash text,
-  birth_date text
+  birth_date text,
+  is_active boolean not null default true,
+  upcoming_appointments jsonb not null default '[]'::jsonb,
+  active_medications jsonb not null default '[]'::jsonb
 );
 
 create table if not exists public.cloud_clinical_rules (
